@@ -3,7 +3,7 @@ function App() {
 
   return (
     <>
-      <div>Project : Inclusive Talent Navigator</div>
+      <div className="text-center">Project : Inclusive Talent Navigator</div>
     </>
   )
 }
