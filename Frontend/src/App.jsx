@@ -1,10 +1,17 @@
+import {Route, Routes} from "react-router-dom"
+
+import LoginPage from "./pages/LoginPage.jsx"
 
 function App() {
 
   return (
-    <>
-      <div className="text-center">Project : Inclusive Talent Navigator</div>
-    </>
+    <div>
+      <Routes>
+
+        <Route path="/login" element={<LoginPage />} />
+      
+      </Routes>
+    </div>
   )
 }
 
