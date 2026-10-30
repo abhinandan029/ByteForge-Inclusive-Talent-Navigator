@@ -7,6 +7,7 @@ from app.models.skills_model import (
     EmployeeSkillsStateResponse
 )
 from app.controllers import skills_controller
+from app.controllers import skills_controller
 
 router = APIRouter(prefix="/api/v1/skills", tags=["Skills Discovery & Confirmation"])
 
