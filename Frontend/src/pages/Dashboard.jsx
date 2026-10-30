@@ -1,741 +1,389 @@
-import { useEffect, useState } from "react"
-import { useNavigate } from "react-router-dom"
 
-import Header from "../components/Header.jsx"
-import Sidebar from "../components/Sidebar.jsx"
-import { getEmployeeSkills } from "../services/skillsApi.js"
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import {
+  UserRound,
+  BriefcaseBusiness,
+  GraduationCap,
+  Brain,
+  CheckCircle2,
+  Clock3,
+  AlertCircle,
+  RefreshCw,
+  ArrowRight,
+  ShieldCheck,
+  Sparkles,
+} from "lucide-react";
 
-
-function Dashboard() {
-  const navigate = useNavigate()
-
-  const [user, setUser] = useState(null)
-  const [employee, setEmployee] = useState(null)
-  const [skills, setSkills] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState("")
-
-  useEffect(() => {
-    const storedUser = sessionStorage.getItem("itn_user")
-
-    if (!storedUser) {
-      navigate("/")
-      return
-    }
-
-    try {
-      const parsedUser = JSON.parse(storedUser)
-
-      setUser(parsedUser)
-
-      const employeeId =
-        parsedUser.employeeId || "emp-ananya"
-
-      loadDashboard(employeeId)
-    } catch (err) {
-      console.error("Invalid session:", err)
-
-      sessionStorage.removeItem("itn_user")
-      navigate("/")
-    }
-  }, [navigate])
+import { getEmployeeSkills } from "../services/skillsApi";
+// Adjust this import path to match your project structure.
 
 
-  async function loadDashboard(employeeId) {
-    try {
-      setLoading(true)
-      setError("")
+function getLoggedInUser() {
+  try {
+    const storedUser = sessionStorage.getItem("itn_user");
 
-      const data = await getEmployeeSkills(employeeId)
+    if (!storedUser) return null;
 
-      console.log("Skills state received:", data)
-
-      const employeeData =
-        data?.employee ||
-        data?.employee_data ||
-        data?.employee_profile ||
-        data?.profile ||
-        null
-
-      const draftSkills =
-        data?.draft_skills ||
-        data?.extracted_skills ||
-        data?.extractedSkills ||
-        []
-
-      const confirmedSkills =
-        data?.confirmed_skills ||
-        data?.confirmedSkills ||
-        []
-
-      const directEmployee =
-        data?.employee_id ||
-        data?.full_name ||
-        data?.current_role
-          ? data
-          : null
-
-      setEmployee(employeeData || directEmployee)
-
-      if (confirmedSkills.length > 0) {
-        setSkills(confirmedSkills)
-      } else {
-        setSkills(draftSkills)
-      }
-
-    } catch (err) {
-      console.error("Dashboard error:", err)
-
-      setError(
-        err.message || "Unable to load employee dashboard."
-      )
-    } finally {
-      setLoading(false)
-    }
+    return JSON.parse(storedUser);
+  } catch {
+    return null;
   }
+}
 
 
-  function handleLogout() {
-    sessionStorage.removeItem("itn_user")
-    navigate("/")
-  }
-
-
-  function getSkillName(skill) {
-    if (typeof skill === "string") {
-      return skill
-    }
-
-    return (
-      skill?.name ||
-      skill?.skill_name ||
-      skill?.NAME ||
-      "Unnamed skill"
-    )
-  }
-
-
-  function getSkillCategory(skill) {
-    if (typeof skill === "string") {
-      return "General"
-    }
-
-    return (
-      skill?.taxonomy_category ||
-      skill?.category ||
-      skill?.TAXONOMY_CATEGORY ||
-      "General"
-    )
-  }
-
-
-  const employeeName =
-    employee?.full_name ||
-    employee?.FULL_NAME ||
-    employee?.name ||
-    "Ananya Rao"
-
-  const employeeRole =
-    employee?.current_role ||
-    employee?.CURRENT_ROLE ||
-    employee?.role ||
-    "Software Engineer"
-
-  const employeeGrade =
-    employee?.grade ||
-    employee?.GRADE ||
-    "G4"
-
-  const yearsExperience =
-    employee?.years_experience ??
-    employee?.YEARS_EXPERIENCE ??
-    4
-
-  const hasCareerBreak =
-    employee?.has_career_break ??
-    employee?.HAS_CAREER_BREAK ??
-    true
-
-  const employeeId =
-    employee?.employee_id ||
-    employee?.EMPLOYEE_ID ||
-    user?.employeeId ||
-    "emp-ananya"
-
-  const confirmed =
-    employee?.is_confirmed ??
-    employee?.IS_CONFIRMED ??
-    false
-
-  const readyForMatching =
-    employee?.ready_for_matching ??
-    employee?.READY_FOR_MATCHING ??
-    false
-
-
+function InfoCard({ icon: Icon, title, value, subtitle }) {
   return (
-    <div className="min-h-screen bg-slate-50">
-
-      <Header />
-
-      <div className="flex">
-
-        <Sidebar />
-
-        <main className="min-w-0 flex-1">
-
-          <div className="mx-auto max-w-7xl px-6 py-8 lg:px-8">
-
-            {/* HEADER */}
-            <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-
-              <div>
-                <p className="text-sm font-medium text-slate-500">
-                  Employee Dashboard
-                </p>
-
-                <h1 className="mt-1 text-3xl font-semibold tracking-tight text-slate-900">
-                  Welcome back, {employeeName.split(" ")[0]}
-                </h1>
-
-                <p className="mt-2 text-sm text-slate-600">
-                  Your inclusive talent journey starts here.
-                </p>
-              </div>
-
-              <button
-                onClick={handleLogout}
-                className="w-fit rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-              >
-                Sign out
-              </button>
-
-            </div>
-
-
-            {/* ERROR */}
-            {error && (
-              <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {error}
-              </div>
-            )}
-
-
-            {/* LOADING */}
-            {loading ? (
-              <div className="space-y-6">
-
-                <div className="h-40 animate-pulse rounded-2xl bg-white ring-1 ring-slate-200" />
-
-                <div className="grid gap-6 lg:grid-cols-3">
-
-                  <div className="h-48 animate-pulse rounded-2xl bg-white ring-1 ring-slate-200" />
-
-                  <div className="h-48 animate-pulse rounded-2xl bg-white ring-1 ring-slate-200" />
-
-                  <div className="h-48 animate-pulse rounded-2xl bg-white ring-1 ring-slate-200" />
-
-                </div>
-
-              </div>
-            ) : (
-              <>
-
-                {/* EMPLOYEE PROFILE */}
-                <section className="mb-8 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
-
-                  <div className="border-b border-slate-200 px-6 py-5">
-
-                    <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-
-                      <div className="flex items-center gap-4">
-
-                        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-900 text-lg font-semibold text-white">
-                          {employeeName
-                            .split(" ")
-                            .map((name) => name[0])
-                            .join("")
-                            .slice(0, 2)
-                            .toUpperCase()}
-                        </div>
-
-                        <div>
-
-                          <h2 className="text-xl font-semibold text-slate-900">
-                            {employeeName}
-                          </h2>
-
-                          <p className="mt-1 text-sm text-slate-600">
-                            {employeeRole} · Grade {employeeGrade}
-                          </p>
-
-                        </div>
-
-                      </div>
-
-                      <div className="flex flex-wrap gap-2">
-
-                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-                          {employeeId}
-                        </span>
-
-                        {hasCareerBreak && (
-                          <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
-                            Career break recorded
-                          </span>
-                        )}
-
-                      </div>
-
-                    </div>
-
-                  </div>
-
-
-                  <div className="grid divide-y divide-slate-200 md:grid-cols-3 md:divide-x md:divide-y-0">
-
-                    <ProfileStat
-                      label="Experience"
-                      value={`${yearsExperience} years`}
-                    />
-
-                    <ProfileStat
-                      label="Skills identified"
-                      value={skills.length}
-                    />
-
-                    <ProfileStat
-                      label="Skills status"
-                      value={
-                        confirmed
-                          ? "Confirmed"
-                          : "Awaiting confirmation"
-                      }
-                    />
-
-                  </div>
-
-                </section>
-
-
-                {/* TALENT JOURNEY */}
-                <section className="mb-8">
-
-                  <div className="mb-4">
-
-                    <h2 className="text-xl font-semibold text-slate-900">
-                      Your talent journey
-                    </h2>
-
-                    <p className="mt-1 text-sm text-slate-600">
-                      Review each stage and confirm information before moving forward.
-                    </p>
-
-                  </div>
-
-
-                  <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-
-                    <JourneyCard
-                      number="01"
-                      title="Skills Discovery"
-                      description="Review skills identified from your profile and confirm what represents you."
-                      status={
-                        confirmed
-                          ? "Completed"
-                          : "Action required"
-                      }
-                      statusType={
-                        confirmed
-                          ? "success"
-                          : "warning"
-                      }
-                      buttonText="Review skills"
-                      onClick={() => navigate("/skills")}
-                    />
-
-
-                    <JourneyCard
-                      number="02"
-                      title="Role Matching"
-                      description="Explore internal opportunities based on your confirmed skills."
-                      status={
-                        readyForMatching
-                          ? "Ready"
-                          : confirmed
-                            ? "Next step"
-                            : "Locked"
-                      }
-                      statusType={
-                        readyForMatching
-                          ? "success"
-                          : confirmed
-                            ? "info"
-                            : "neutral"
-                      }
-                      buttonText="View matching"
-                      onClick={() => navigate("/matching")}
-                      disabled={!confirmed}
-                    />
-
-
-                    <JourneyCard
-                      number="03"
-                      title="Fairness Review"
-                      description="Review criteria signals that may need additional human review."
-                      status="Human review"
-                      statusType="info"
-                      buttonText="View review"
-                      onClick={() => navigate("/bias-audit")}
-                    />
-
-
-                    <JourneyCard
-                      number="04"
-                      title="Learning Path"
-                      description="Discover learning opportunities aligned with your career direction."
-                      status="Upcoming"
-                      statusType="neutral"
-                      buttonText="View learning"
-                      onClick={() => navigate("/learning")}
-                    />
-
-                  </div>
-
-                </section>
-
-
-                {/* SKILLS + STATUS */}
-                <div className="grid gap-6 lg:grid-cols-3">
-
-                  {/* SKILLS */}
-                  <section className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200 lg:col-span-2">
-
-                    <div className="flex items-start justify-between gap-4">
-
-                      <div>
-                        <h2 className="text-lg font-semibold text-slate-900">
-                          Skills snapshot
-                        </h2>
-
-                        <p className="mt-1 text-sm text-slate-600">
-                          Skills currently available in your talent profile.
-                        </p>
-                      </div>
-
-                      <button
-                        onClick={() => navigate("/skills")}
-                        className="shrink-0 text-sm font-medium text-slate-900 underline underline-offset-4 hover:text-slate-600"
-                      >
-                        Review
-                      </button>
-
-                    </div>
-
-
-                    {skills.length === 0 ? (
-                      <div className="mt-6 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center">
-
-                        <p className="text-sm font-medium text-slate-700">
-                          No skills have been identified yet.
-                        </p>
-
-                        <p className="mt-1 text-xs text-slate-500">
-                          Open Skills Discovery to extract and review your skills.
-                        </p>
-
-                      </div>
-                    ) : (
-                      <div className="mt-6 flex flex-wrap gap-3">
-
-                        {skills.slice(0, 12).map((skill, index) => (
-                          <div
-                            key={`${getSkillName(skill)}-${index}`}
-                            className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
-                          >
-
-                            <p className="text-sm font-medium text-slate-900">
-                              {getSkillName(skill)}
-                            </p>
-
-                            <p className="mt-1 text-xs text-slate-500">
-                              {getSkillCategory(skill)}
-                            </p>
-
-                          </div>
-                        ))}
-
-                      </div>
-                    )}
-
-                  </section>
-
-
-                  {/* PROFILE STATUS */}
-                  <section className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-
-                    <h2 className="text-lg font-semibold text-slate-900">
-                      Profile status
-                    </h2>
-
-                    <p className="mt-1 text-sm text-slate-600">
-                      Current progress in your talent journey.
-                    </p>
-
-                    <div className="mt-6 space-y-5">
-
-                      <StatusRow
-                        label="AI skill discovery"
-                        completed={skills.length > 0}
-                      />
-
-                      <StatusRow
-                        label="Employee confirmation"
-                        completed={confirmed}
-                      />
-
-                      <StatusRow
-                        label="Ready for matching"
-                        completed={readyForMatching}
-                      />
-
-                      <StatusRow
-                        label="Learning pathway"
-                        completed={false}
-                      />
-
-                    </div>
-
-                  </section>
-
-                </div>
-
-
-                {/* RESPONSIBLE AI */}
-                <section className="mt-6 rounded-2xl bg-slate-900 p-6 text-white">
-
-                  <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
-
-                    <div className="max-w-3xl">
-
-                      <div className="flex items-center gap-3">
-
-                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10">
-                          <span className="text-xs font-semibold">
-                            AI
-                          </span>
-                        </div>
-
-                        <h2 className="text-lg font-semibold">
-                          Responsible AI by design
-                        </h2>
-
-                      </div>
-
-                      <p className="mt-3 text-sm leading-6 text-slate-300">
-                        AI recommendations support employees and HR teams
-                        rather than replacing human decisions. Employees
-                        confirm their skills before matching, while fairness
-                        signals are presented for human review.
-                      </p>
-
-                    </div>
-
-
-                    <div className="shrink-0 rounded-xl bg-white/10 px-4 py-3">
-
-                      <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                        Principle
-                      </p>
-
-                      <p className="mt-1 text-sm font-semibold text-white">
-                        Agents recommend. Humans decide.
-                      </p>
-
-                    </div>
-
-                  </div>
-
-                </section>
-
-
-                {/* AUDIT */}
-                <section className="mt-6 flex flex-col gap-4 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 sm:flex-row sm:items-center sm:justify-between">
-
-                  <div>
-
-                    <h3 className="text-sm font-semibold text-slate-900">
-                      Transparency & audit trail
-                    </h3>
-
-                    <p className="mt-1 text-sm text-slate-600">
-                      Review recorded actions related to your talent journey.
-                    </p>
-
-                  </div>
-
-                  <button
-                    onClick={() => navigate("/audit-log")}
-                    className="w-fit rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                  >
-                    View audit log
-                  </button>
-
-                </section>
-
-              </>
-            )}
-
-          </div>
-
-        </main>
-
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+        <Icon size={21} />
       </div>
 
-    </div>
-  )
-}
+      <p className="text-sm text-slate-500">{title}</p>
 
-
-/* =====================================================
-   PROFILE STAT
-===================================================== */
-
-function ProfileStat({ label, value }) {
-  return (
-    <div className="px-6 py-4">
-
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-        {label}
-      </p>
-
-      <p className="mt-1 text-base font-semibold text-slate-900">
+      <h3 className="mt-1 text-xl font-bold text-slate-800">
         {value}
-      </p>
+      </h3>
 
+      {subtitle && (
+        <p className="mt-1 text-xs text-slate-500">{subtitle}</p>
+      )}
     </div>
-  )
+  );
 }
 
 
-/* =====================================================
-   JOURNEY CARD
-===================================================== */
-
-function JourneyCard({
-  number,
-  title,
-  description,
-  status,
-  statusType,
-  buttonText,
-  onClick,
-  disabled = false,
-}) {
-  const statusClasses = {
-    success: "bg-emerald-50 text-emerald-700",
-    warning: "bg-amber-50 text-amber-700",
-    info: "bg-blue-50 text-blue-700",
-    neutral: "bg-slate-100 text-slate-600",
-  }
+function SkillList({ title, skills, type }) {
+  const isConfirmed = type === "confirmed";
 
   return (
-    <div
-      className={`flex min-h-[260px] flex-col rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200 ${
-        disabled ? "opacity-75" : ""
-      }`}
-    >
-
-      <div className="flex items-center justify-between">
-
-        <span className="text-xs font-semibold tracking-widest text-slate-400">
-          {number}
-        </span>
+    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div>
+          <h3 className="font-semibold text-slate-800">{title}</h3>
+          <p className="mt-1 text-sm text-slate-500">
+            {skills.length} skill{skills.length === 1 ? "" : "s"}
+          </p>
+        </div>
 
         <span
-          className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-            statusClasses[statusType]
+          className={`rounded-full px-3 py-1 text-xs font-medium ${
+            isConfirmed
+              ? "bg-emerald-50 text-emerald-700"
+              : "bg-amber-50 text-amber-700"
           }`}
         >
-          {status}
+          {isConfirmed ? "Employee verified" : "Awaiting confirmation"}
         </span>
-
       </div>
 
-
-      <div className="mt-6">
-
-        <h3 className="text-lg font-semibold text-slate-900">
-          {title}
-        </h3>
-
-        <p className="mt-2 text-sm leading-6 text-slate-600">
-          {description}
+      {skills.length === 0 ? (
+        <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">
+          No skills available yet.
         </p>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {skills.map((skill, index) => (
+            <span
+              key={skill.skill_id || `${skill.name}-${index}`}
+              className={`rounded-lg border px-3 py-2 text-sm ${
+                isConfirmed
+                  ? "border-emerald-100 bg-emerald-50 text-emerald-800"
+                  : "border-indigo-100 bg-indigo-50 text-indigo-800"
+              }`}
+              title={skill.evidence_snippet || ""}
+            >
+              {skill.name}
+              {skill.taxonomy_category && (
+                <span className="ml-2 text-xs opacity-60">
+                  {skill.taxonomy_category}
+                </span>
+              )}
+            </span>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
 
+
+export default function Dashboard() {
+  const [employeeId] = useState(() => {
+    const user = getLoggedInUser();
+
+    return user?.employeeId || user?.employee_id || "";
+  });
+
+  const [employeeData, setEmployeeData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadDashboard() {
+      if (!employeeId) {
+        setError("Your employee ID could not be found. Please log in again.");
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setError("");
+
+        const data = await getEmployeeSkills(employeeId);
+
+        if (active) {
+          setEmployeeData(data);
+        }
+      } catch (err) {
+        if (active) {
+          setError(err.message || "Unable to load dashboard.");
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadDashboard();
+
+    return () => {
+      active = false;
+    };
+  }, [employeeId]);
+
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="text-center">
+          <RefreshCw className="mx-auto animate-spin text-indigo-600" size={30} />
+          <p className="mt-3 text-sm text-slate-500">
+            Loading your dashboard...
+          </p>
+        </div>
       </div>
+    );
+  }
 
 
-      <div className="mt-auto pt-6">
+  if (error) {
+    return (
+      <div className="mx-auto mt-12 max-w-xl rounded-2xl border border-red-200 bg-red-50 p-6 text-center">
+        <AlertCircle className="mx-auto text-red-600" size={32} />
+
+        <h2 className="mt-3 font-semibold text-red-800">
+          Unable to load dashboard
+        </h2>
+
+        <p className="mt-2 text-sm text-red-700">{error}</p>
 
         <button
-          onClick={onClick}
-          disabled={disabled}
-          className={`w-full rounded-lg px-4 py-2.5 text-sm font-medium transition ${
-            disabled
-              ? "cursor-not-allowed bg-slate-100 text-slate-400"
-              : "bg-slate-900 text-white hover:bg-slate-800"
-          }`}
+          onClick={() => window.location.reload()}
+          className="mt-5 rounded-xl bg-red-600 px-5 py-2 text-sm font-medium text-white hover:bg-red-700"
         >
-          {buttonText}
+          Reload page
         </button>
-
       </div>
-
-    </div>
-  )
-}
+    );
+  }
 
 
-/* =====================================================
-   STATUS ROW
-===================================================== */
+  const employee = employeeData?.employee;
+  const draftSkills = employeeData?.extracted_skills_draft || [];
+  const confirmedSkills = employeeData?.confirmed_skills_final || [];
 
-function StatusRow({ label, completed }) {
+  const isConfirmed = Boolean(
+    employee?.is_confirmed ?? employeeData?.is_confirmed
+  );
+
+  const readyForMatching = Boolean(employee?.ready_for_matching);
+
+
   return (
-    <div className="flex items-center gap-3">
+    <main className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 lg:px-10">
+      <div className="mx-auto max-w-7xl">
 
-      <div
-        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
-          completed
-            ? "bg-emerald-100 text-emerald-700"
-            : "bg-slate-100 text-slate-400"
-        }`}
-      >
-        {completed ? "✓" : "•"}
+        {/* HEADER */}
+        <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+          <div>
+            <p className="text-sm font-medium text-indigo-600">
+              INCLUSIVE TALENT NAVIGATOR
+            </p>
+
+            <h1 className="mt-2 text-3xl font-bold text-slate-900">
+              Welcome, {employee?.full_name || "Employee"}
+            </h1>
+
+            <p className="mt-2 text-slate-500">
+              Your employee profile and skills overview.
+            </p>
+          </div>
+
+          <Link
+            to="/skills"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700"
+          >
+            Manage Skills
+            <ArrowRight size={17} />
+          </Link>
+        </div>
+
+
+        {/* EMPLOYEE PROFILE */}
+        <section className="mb-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-700">
+              <UserRound size={30} />
+            </div>
+
+            <div className="flex-1">
+              <h2 className="text-xl font-bold text-slate-900">
+                {employee?.full_name || "Employee"}
+              </h2>
+
+              <p className="mt-1 text-slate-500">
+                {employee?.current_role || "Role not provided"}
+              </p>
+
+              <p className="mt-2 text-xs text-slate-400">
+                Employee ID: {employee?.employee_id || employeeId}
+              </p>
+            </div>
+
+            <div
+              className={`inline-flex items-center gap-2 self-start rounded-full px-4 py-2 text-sm font-medium sm:self-center ${
+                readyForMatching
+                  ? "bg-emerald-50 text-emerald-700"
+                  : "bg-amber-50 text-amber-700"
+              }`}
+            >
+              {readyForMatching ? (
+                <CheckCircle2 size={17} />
+              ) : (
+                <Clock3 size={17} />
+              )}
+
+              {readyForMatching ? "Ready for matching" : "Not ready for matching"}
+            </div>
+          </div>
+        </section>
+
+
+        {/* PROFILE INFORMATION */}
+        <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <InfoCard
+            icon={BriefcaseBusiness}
+            title="Current Role"
+            value={employee?.current_role || "Not provided"}
+          />
+
+          <InfoCard
+            icon={GraduationCap}
+            title="Grade"
+            value={employee?.grade || "Not provided"}
+          />
+
+          <InfoCard
+            icon={Clock3}
+            title="Experience"
+            value={
+              employee?.years_experience != null
+                ? `${employee.years_experience} years`
+                : "Not provided"
+            }
+          />
+
+          <InfoCard
+            icon={Brain}
+            title="Career Break"
+            value={employee?.has_career_break ? "Yes" : "No"}
+          />
+        </div>
+
+
+        {/* SKILLS OVERVIEW */}
+        <div className="mb-5">
+          <h2 className="text-xl font-bold text-slate-900">
+            Skills Overview
+          </h2>
+
+          <p className="mt-1 text-sm text-slate-500">
+            Skills extracted from your profile and skills confirmed by you.
+          </p>
+        </div>
+
+        <div className="mb-8 grid grid-cols-1 gap-5 lg:grid-cols-2">
+          <SkillList
+            title="Extracted Skills"
+            skills={draftSkills}
+            type="draft"
+          />
+
+          <SkillList
+            title="Confirmed Skills"
+            skills={confirmedSkills}
+            type="confirmed"
+          />
+        </div>
+
+
+        {/* STATUS */}
+        <section className="grid grid-cols-1 gap-5 md:grid-cols-2">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="rounded-xl bg-indigo-50 p-3 text-indigo-600">
+                <Sparkles size={21} />
+              </div>
+
+              <div>
+                <h3 className="font-semibold text-slate-800">
+                  Skills Confirmation
+                </h3>
+
+                <p className="text-sm text-slate-500">
+                  {isConfirmed
+                    ? "Your skills have been confirmed."
+                    : "Your extracted skills still need your review."}
+                </p>
+              </div>
+            </div>
+
+            <Link
+              to="/skills"
+              className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-indigo-600 hover:text-indigo-800"
+            >
+              {isConfirmed ? "Review skills" : "Confirm your skills"}
+              <ArrowRight size={16} />
+            </Link>
+          </div>
+
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="rounded-xl bg-emerald-50 p-3 text-emerald-600">
+                <ShieldCheck size={21} />
+              </div>
+
+              <div>
+                <h3 className="font-semibold text-slate-800">
+                  Responsible AI
+                </h3>
+
+                <p className="text-sm text-slate-500">
+                  Skills are presented for employee review and confirmation
+                  before matching readiness is enabled.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
       </div>
-
-      <div>
-
-        <p
-          className={`text-sm font-medium ${
-            completed
-              ? "text-slate-900"
-              : "text-slate-500"
-          }`}
-        >
-          {label}
-        </p>
-
-        <p className="text-xs text-slate-400">
-          {completed ? "Completed" : "Pending"}
-        </p>
-
-      </div>
-
-    </div>
-  )
+    </main>
+  );
 }
-
-
-export default Dashboard

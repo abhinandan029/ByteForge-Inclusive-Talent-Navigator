@@ -1,72 +1,108 @@
-const API_BASE_URL = "/api/v1/skills"
 
-export async function getEmployeeSkills(employeeId = "emp-ananya") {
-  const response = await fetch(
+const BACKEND_URL =
+  import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
+
+const API_BASE_URL = `${BACKEND_URL}/api/skills`;
+
+const CACHE_DURATION = 15 * 1000;
+
+const employeeSkillsCache = new Map();
+const employeeSkillsRequests = new Map();
+
+async function request(url, options = {}) {
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+    credentials: "include",
+  });
+
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(
+      data?.detail || data?.message || `Request failed (${response.status})`
+    );
+  }
+
+  return data;
+}
+
+// GET EMPLOYEE SKILLS
+export async function getEmployeeSkills(employeeId) {
+  if (!employeeId) {
+    throw new Error("Employee ID is missing.");
+  }
+
+  const cached = employeeSkillsCache.get(employeeId);
+
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    return cached.data;
+  }
+
+  // Reuse an already-running request for this employee.
+  if (employeeSkillsRequests.has(employeeId)) {
+    return employeeSkillsRequests.get(employeeId);
+  }
+
+  const promise = request(
     `${API_BASE_URL}/${encodeURIComponent(employeeId)}`
   )
+    .then((data) => {
+      employeeSkillsCache.set(employeeId, {
+        data,
+        timestamp: Date.now(),
+      });
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => null)
+      return data;
+    })
+    .finally(() => {
+      employeeSkillsRequests.delete(employeeId);
+    });
 
-    throw new Error(
-      errorData?.detail ||
-        `Unable to fetch skills for employee ${employeeId}`
-    )
-  }
+  employeeSkillsRequests.set(employeeId, promise);
 
-  return response.json()
+  return promise;
 }
 
+// EXTRACT SKILLS
 export async function extractSkills(payload) {
-  const response = await fetch(`${API_BASE_URL}/extract`, {
+  const data = await request(`${API_BASE_URL}/extract`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
     body: JSON.stringify(payload),
-  })
+  });
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => null)
+  invalidateEmployeeSkills(payload.employee_id);
 
-    throw new Error(
-      errorData?.detail || "Unable to extract skills"
-    )
-  }
-
-  return response.json()
+  return data;
 }
 
+// CONFIRM SKILLS
 export async function confirmSkills(payload) {
-  const response = await fetch(`${API_BASE_URL}/confirm`, {
+  const data = await request(`${API_BASE_URL}/confirm`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
     body: JSON.stringify(payload),
-  })
+  });
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => null)
+  invalidateEmployeeSkills(payload.employee_id);
 
-    throw new Error(
-      errorData?.detail || "Unable to confirm skills"
-    )
-  }
-
-  return response.json()
+  return data;
 }
 
-export async function getSkillsAuditLogs() {
-  const response = await fetch(`${API_BASE_URL}/audit/logs`)
+// AUDIT LOGS
+export async function getSkillsAuditLogs(employeeId = null) {
+  const url = employeeId
+    ? `${API_BASE_URL}/audit/logs?employee_id=${encodeURIComponent(employeeId)}`
+    : `${API_BASE_URL}/audit/logs`;
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => null)
+  return request(url);
+}
 
-    throw new Error(
-      errorData?.detail || "Unable to fetch skills audit logs"
-    )
+// Clear cached data after a mutation.
+export function invalidateEmployeeSkills(employeeId) {
+  if (employeeId) {
+    employeeSkillsCache.delete(employeeId);
   }
-
-  return response.json()
 }

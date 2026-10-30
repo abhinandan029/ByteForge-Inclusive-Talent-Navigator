@@ -1,87 +1,440 @@
-from pydantic import BaseModel, Field
-from typing import List, Optional
 
-class ProfileExtractRequest(BaseModel):
-    employee_id: str = Field(
-        default="emp-ananya",
-        description="Synthetic employee identifier"
+from utils.database import get_connection, release_connection
+
+# ==================================================
+# DATABASE HELPERS
+# ==================================================
+
+def _fetch_all(cursor):
+    """Convert cursor rows into dictionaries using column names."""
+    columns = [column[0].lower() for column in cursor.description]
+    rows = cursor.fetchall()
+
+    return [
+        dict(zip(columns, row))
+        for row in rows
+    ]
+
+
+def _fetch_one(cursor):
+    """Fetch one row as a dictionary."""
+    row = cursor.fetchone()
+
+    if row is None:
+        return None
+
+    columns = [column[0].lower() for column in cursor.description]
+
+    return dict(zip(columns, row))
+
+
+def _close_resources(cursor=None, conn=None):
+    if cursor:
+        try:
+            cursor.close()
+        except Exception:
+            pass
+
+    if conn:
+        release_connection(conn)
+        
+
+def _to_bool(value):
+    """
+    Convert SAP HANA TINYINT / BOOLEAN values
+    into Python Boolean values.
+    """
+    if isinstance(value, str):
+        return value.strip().lower() in ("1", "true", "yes")
+
+    return bool(value)
+
+
+def _add_audit_log(
+    cursor,
+    employee_id,
+    actor,
+    action,
+    tool,
+    details
+):
+    cursor.execute(
+        """
+        INSERT INTO AUDIT_LOGS
+        (
+            EMPLOYEE_ID,
+            ACTOR,
+            ACTION,
+            TOOL,
+            DETAILS
+        )
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (
+            employee_id,
+            actor,
+            action,
+            tool,
+            details
+        )
     )
-    profile_text: str = Field(
-        ...,
-        description="Free-text profile for Ananya (FR-1)",
-        json_schema_extra={
-            "example": (
-                "Ananya Rao, 28, Software Engineer returning from a 14-month caregiving break. "
-                "Previously built microservices in Python and FastAPI, deployed containerized apps "
-                "on Docker, and optimized PostgreSQL queries. Recently completed a cloud course on SAP BTP."
+
+
+# ==================================================
+# SAVE EXTRACTED SKILLS
+# ==================================================
+
+def save_extracted_skills(employee_id, extracted_skills):
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        # Verify employee exists
+        cursor.execute(
+            """
+            SELECT EMPLOYEE_ID
+            FROM EMPLOYEES
+            WHERE EMPLOYEE_ID = ?
+            """,
+            (employee_id,)
+        )
+
+        if not cursor.fetchone():
+            raise ValueError("Employee not found")
+
+        # Remove previous draft skills
+        cursor.execute(
+            """
+            DELETE FROM EXTRACTED_SKILLS_DRAFT
+            WHERE EMPLOYEE_ID = ?
+            """,
+            (employee_id,)
+        )
+
+        # Save latest extracted skills
+        for skill in extracted_skills:
+            cursor.execute(
+                """
+                INSERT INTO EXTRACTED_SKILLS_DRAFT
+                (
+                    EMPLOYEE_ID,
+                    SKILL_ID,
+                    NAME,
+                    TAXONOMY_CATEGORY,
+                    EVIDENCE_SNIPPET
+                )
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    employee_id,
+                    skill["skill_id"],
+                    skill["name"],
+                    skill.get("taxonomy_category", "General"),
+                    skill.get("evidence_snippet", "")
+                )
             )
+
+        # Reset confirmation and matching status.
+        # These columns are TINYINT in SAP HANA.
+        cursor.execute(
+            """
+            UPDATE EMPLOYEES
+            SET
+                IS_CONFIRMED = 0,
+                READY_FOR_MATCHING = 0,
+                UPDATED_AT = CURRENT_TIMESTAMP
+            WHERE EMPLOYEE_ID = ?
+            """,
+            (employee_id,)
+        )
+
+        _add_audit_log(
+            cursor,
+            employee_id,
+            "AI_AGENT",
+            "SKILLS_EXTRACTED",
+            "SKILLS_DISCOVERY",
+            f"{len(extracted_skills)} skills extracted"
+        )
+
+        conn.commit()
+
+        return True
+
+    except Exception:
+        if conn:
+            conn.rollback()
+        raise
+
+    finally:
+        _close_resources(cursor, conn)
+
+
+# ==================================================
+# SAVE CONFIRMED SKILLS
+# ==================================================
+
+def save_confirmed_skills(employee_id, confirmed_skills):
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        # Verify employee exists
+        cursor.execute(
+            """
+            SELECT EMPLOYEE_ID
+            FROM EMPLOYEES
+            WHERE EMPLOYEE_ID = ?
+            """,
+            (employee_id,)
+        )
+
+        if not cursor.fetchone():
+            raise ValueError("Employee not found")
+
+        # Replace previously confirmed skills
+        cursor.execute(
+            """
+            DELETE FROM CONFIRMED_SKILLS_FINAL
+            WHERE EMPLOYEE_ID = ?
+            """,
+            (employee_id,)
+        )
+
+        # Insert employee-confirmed skills
+        for skill in confirmed_skills:
+            cursor.execute(
+                """
+                INSERT INTO CONFIRMED_SKILLS_FINAL
+                (
+                    EMPLOYEE_ID,
+                    NAME,
+                    TAXONOMY_CATEGORY,
+                    EVIDENCE_SNIPPET
+                )
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    employee_id,
+                    skill["name"],
+                    skill.get("taxonomy_category", "General"),
+                    skill.get("evidence_snippet", "")
+                )
+            )
+
+        # Mark employee as confirmed and ready for matching.
+        # These columns are TINYINT in SAP HANA.
+        cursor.execute(
+            """
+            UPDATE EMPLOYEES
+            SET
+                IS_CONFIRMED = 1,
+                READY_FOR_MATCHING = 1,
+                UPDATED_AT = CURRENT_TIMESTAMP
+            WHERE EMPLOYEE_ID = ?
+            """,
+            (employee_id,)
+        )
+
+        _add_audit_log(
+            cursor,
+            employee_id,
+            "EMPLOYEE",
+            "SKILLS_CONFIRMED",
+            "SKILLS_DISCOVERY",
+            f"{len(confirmed_skills)} skills confirmed"
+        )
+
+        conn.commit()
+
+        return True
+
+    except Exception:
+        if conn:
+            conn.rollback()
+        raise
+
+    finally:
+        _close_resources(cursor, conn)
+
+
+# ==================================================
+# GET EMPLOYEE + SKILLS STATE
+# ==================================================
+
+
+import time
+
+def get_employee_skills(employee_id):
+    conn = None
+    cursor = None
+
+    total_start = time.perf_counter()
+
+    try:
+        # 1. Database connection
+        start = time.perf_counter()
+        conn = get_connection()
+        print(f"[TIMING] Connection: {time.perf_counter() - start:.3f}s")
+
+        cursor = conn.cursor()
+
+        # 2. Employee profile
+        start = time.perf_counter()
+
+        cursor.execute(
+            """
+            SELECT
+                EMPLOYEE_ID,
+                FULL_NAME,
+                CURRENT_ROLE,
+                GRADE,
+                YEARS_EXPERIENCE,
+                HAS_CAREER_BREAK,
+                IS_CONFIRMED,
+                READY_FOR_MATCHING
+            FROM EMPLOYEES
+            WHERE EMPLOYEE_ID = ?
+            """,
+            (employee_id,)
+        )
+
+        employee = _fetch_one(cursor)
+
+        print(
+            f"[TIMING] Employee query + fetch: "
+            f"{time.perf_counter() - start:.3f}s"
+        )
+
+        if not employee:
+            raise ValueError("Employee not found")
+
+        employee["has_career_break"] = _to_bool(
+            employee["has_career_break"]
+        )
+        employee["is_confirmed"] = _to_bool(
+            employee["is_confirmed"]
+        )
+        employee["ready_for_matching"] = _to_bool(
+            employee["ready_for_matching"]
+        )
+
+        # 3. Extracted draft skills
+        start = time.perf_counter()
+
+        cursor.execute(
+            """
+            SELECT
+                SKILL_ID,
+                NAME,
+                TAXONOMY_CATEGORY,
+                EVIDENCE_SNIPPET
+            FROM EXTRACTED_SKILLS_DRAFT
+            WHERE EMPLOYEE_ID = ?
+            ORDER BY NAME
+            """,
+            (employee_id,)
+        )
+
+        draft_skills = _fetch_all(cursor)
+
+        print(
+            f"[TIMING] Draft skills query + fetch: "
+            f"{time.perf_counter() - start:.3f}s"
+        )
+
+        # 4. Confirmed skills
+        start = time.perf_counter()
+
+        cursor.execute(
+            """
+            SELECT
+                NAME,
+                TAXONOMY_CATEGORY,
+                EVIDENCE_SNIPPET
+            FROM CONFIRMED_SKILLS_FINAL
+            WHERE EMPLOYEE_ID = ?
+            ORDER BY NAME
+            """,
+            (employee_id,)
+        )
+
+        confirmed_skills = _fetch_all(cursor)
+
+        print(
+            f"[TIMING] Confirmed skills query + fetch: "
+            f"{time.perf_counter() - start:.3f}s"
+        )
+
+        print(
+            f"[TIMING] Total model execution: "
+            f"{time.perf_counter() - total_start:.3f}s"
+        )
+
+        return {
+            "employee": employee,
+            "employee_id": employee_id,
+            "is_confirmed": employee["is_confirmed"],
+            "extracted_skills_draft": draft_skills,
+            "confirmed_skills_final": confirmed_skills
         }
-    )
 
-class SkillItem(BaseModel):
-    skill_id: str = Field(..., json_schema_extra={"example": "sk-101"})
-    name: str = Field(..., json_schema_extra={"example": "Python"})
-    taxonomy_category: str = Field(..., json_schema_extra={"example": "Backend Development"})
-    evidence_snippet: str = Field(
-        ...,
-        description="Snippet from profile text proving the skill (FR-2)",
-        json_schema_extra={"example": "built microservices in Python and FastAPI"}
-    )
+    finally:
+        _close_resources(cursor, conn)
 
-class ProfileExtractResponse(BaseModel):
-    employee_id: str
-    status: str
-    extracted_skills: List[SkillItem]
-    simulated_data_notice: str = "Simulated Data - Local Fallback Active (R8)"
 
-class SkillConfirmationItem(BaseModel):
-    name: str = Field(..., json_schema_extra={"example": "Python"})
-    taxonomy_category: str = Field(default="General", json_schema_extra={"example": "Backend Development"})
-    evidence_snippet: Optional[str] = Field(
-        default="Confirmed/Added by employee",
-        json_schema_extra={"example": "built microservices in Python and FastAPI"}
-    )
+# ==================================================
+# GET AUDIT LOGS
+# ==================================================
 
-class SkillConfirmRequest(BaseModel):
-    employee_id: str = Field(default="emp-ananya")
-    confirmed_skills: List[SkillConfirmationItem] = Field(
-        ...,
-        description="Final list after Ananya accepts, removes, or adds skills (FR-3, R1)",
-        json_schema_extra={
-            "example": [
-                {
-                    "name": "Python",
-                    "taxonomy_category": "Backend Development",
-                    "evidence_snippet": "built microservices in Python and FastAPI"
-                },
-                {
-                    "name": "FastAPI",
-                    "taxonomy_category": "Backend Frameworks",
-                    "evidence_snippet": "built microservices in Python and FastAPI"
-                },
-                {
-                    "name": "SAP BTP",
-                    "taxonomy_category": "Cloud Platform",
-                    "evidence_snippet": "completed a cloud course on SAP BTP"
-                },
-                {
-                    "name": "Git",
-                    "taxonomy_category": "Version Control",
-                    "evidence_snippet": "Added manually by Ananya during confirmation"
-                }
-            ]
-        }
-    )
+def get_audit_logs(employee_id=None):
+    conn = None
+    cursor = None
 
-class SkillConfirmResponse(BaseModel):
-    employee_id: str
-    status: str
-    confirmed_count: int
-    ready_for_matching: bool
-    confirmed_skills: List[SkillConfirmationItem]
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
 
-class EmployeeSkillsStateResponse(BaseModel):
-    employee_id: str
-    is_confirmed: bool
-    extracted_skills_draft: List[SkillItem]
-    confirmed_skills_final: List[SkillConfirmationItem]
+        if employee_id:
+            cursor.execute(
+                """
+                SELECT
+                    LOG_ID,
+                    TIMESTAMP,
+                    EMPLOYEE_ID,
+                    ACTOR,
+                    ACTION,
+                    TOOL,
+                    DETAILS
+                FROM AUDIT_LOGS
+                WHERE EMPLOYEE_ID = ?
+                ORDER BY TIMESTAMP DESC
+                """,
+                (employee_id,)
+            )
+        else:
+            cursor.execute(
+                """
+                SELECT
+                    LOG_ID,
+                    TIMESTAMP,
+                    EMPLOYEE_ID,
+                    ACTOR,
+                    ACTION,
+                    TOOL,
+                    DETAILS
+                FROM AUDIT_LOGS
+                ORDER BY TIMESTAMP DESC
+                """
+            )
+
+        return _fetch_all(cursor)
+
+    finally:
+        _close_resources(cursor, conn)

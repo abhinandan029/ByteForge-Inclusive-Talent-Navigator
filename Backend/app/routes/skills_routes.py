@@ -1,32 +1,77 @@
-from fastapi import APIRouter
-from app.models.skills_model import (
+
+from fastapi import APIRouter, Query
+
+from app.schemas.skills_schema import (
     ProfileExtractRequest,
     ProfileExtractResponse,
     SkillConfirmRequest,
     SkillConfirmResponse,
     EmployeeSkillsStateResponse
 )
-from app.controllers import skills_controller
+
 from app.controllers import skills_controller
 
-router = APIRouter(prefix="/api/skills", tags=["Skills Discovery & Confirmation"])
 
-@router.post("/extract", response_model=ProfileExtractResponse)
+router = APIRouter(
+    prefix="/api/skills",
+    tags=["Skills Discovery & Confirmation"]
+)
+
+
+# =====================================================
+# EXTRACT SKILLS
+# =====================================================
+
+@router.post(
+    "/extract",
+    response_model=ProfileExtractResponse
+)
 async def extract_skills(payload: ProfileExtractRequest):
-    """FR-1 & FR-2: Extract structured skills with evidence snippets from profile text."""
-    return await skills_controller.extract_skills_controller(payload)
 
-@router.post("/confirm", response_model=SkillConfirmResponse)
+    return await skills_controller.extract_skills_controller(
+        payload
+    )
+
+
+# =====================================================
+# CONFIRM SKILLS
+# =====================================================
+
+@router.post(
+    "/confirm",
+    response_model=SkillConfirmResponse
+)
 async def confirm_skills(payload: SkillConfirmRequest):
-    """FR-3 & R1: Employee accepts, removes, or adds skills before matching."""
-    return await skills_controller.confirm_skills_controller(payload)
+
+    return await skills_controller.confirm_skills_controller(
+        payload
+    )
+
+
+# =====================================================
+# GET AUDIT LOGS
+# =====================================================
 
 @router.get("/audit/logs")
-async def get_skills_audit_logs():
-    """FR-9 & S4: View audit log events for skills extraction and human confirmation."""
-    return await skills_controller.get_skills_audit_controller()
+async def get_skills_audit_logs(
+    employee_id: str | None = Query(default=None)
+):
 
-@router.get("/{employee_id}", response_model=EmployeeSkillsStateResponse)
-async def get_employee_skills(employee_id: str = "emp-ananya"):
-    """Inspect draft extracted skills vs. human-confirmed skills for an employee."""
-    return await skills_controller.get_skills_state_controller(employee_id)
+    return await skills_controller.get_skills_audit_controller(
+        employee_id
+    )
+
+
+# =====================================================
+# GET EMPLOYEE SKILLS AND PROFILE
+# =====================================================
+
+@router.get(
+    "/{employee_id}",
+    response_model=EmployeeSkillsStateResponse
+)
+async def get_employee_skills(employee_id: str):
+
+    return await skills_controller.get_skills_state_controller(
+        employee_id
+    )

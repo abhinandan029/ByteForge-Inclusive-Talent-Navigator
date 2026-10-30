@@ -1,15 +1,36 @@
+
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from utils.database import get_connection
+
+from utils.database import (
+    get_connection,
+    release_connection,
+    initialize_pool,
+    close_pool
+)
+
 from app.routes.skills_routes import router as skills_router
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    initialize_pool()
+
+    yield
+
+    close_pool()
+
 
 app = FastAPI(
     title="Inclusive Talent Navigator API",
     description="SAP Hackfest 2026 - Round 2 Prototype Backend",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
-# Enable CORS for React Frontend integration
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -21,7 +42,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Register Modular Routers
+
 app.include_router(skills_router)
 
 
@@ -73,4 +94,4 @@ def database_health():
             cursor.close()
 
         if connection:
-            connection.close()
+            release_connection(connection)

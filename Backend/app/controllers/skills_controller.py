@@ -1,125 +1,236 @@
+
 from fastapi import HTTPException
-from datetime import datetime, timezone
-from typing import List, Dict, Any
-from app.models.skills_model import (
+
+from app.schemas.skills_schema import (
     ProfileExtractRequest,
     ProfileExtractResponse,
-    SkillItem,
     SkillConfirmRequest,
     SkillConfirmResponse,
     EmployeeSkillsStateResponse
 )
 
-# In-memory store for prototype testing before SQLite/JSONL is wired
-MOCK_DB: Dict[str, Any] = {
-    "extracted_skills": {},
-    "confirmed_skills": {},
-    "audit_log": []
-}
+from app.models.skills_model import (
+    save_extracted_skills,
+    save_confirmed_skills,
+    get_employee_skills,
+    get_audit_logs
+)
 
-def record_audit_event(actor: str, action: str, tool: str, details: str):
-    """Records time, actor, action, and MCP tool for every event (FR-9, S4)."""
-    MOCK_DB["audit_log"].append({
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "actor": actor,
-        "action": action,
-        "tool": tool,
-        "details": details
-    })
+from starlette.concurrency import run_in_threadpool
 
-async def _call_skills_mcp_stub(profile_text: str) -> List[SkillItem]:
-    """
-    TEAMMATE HOOK: Replace this stub with the MCP client call to `skills-server`
-    tools: `extract_skills(text)` and `normalize_skills(list)`.
-    """
-    return [
-        SkillItem(
-            skill_id="sk-101",
-            name="Python",
-            taxonomy_category="Backend Development",
-            evidence_snippet="built microservices in Python and FastAPI"
-        ),
-        SkillItem(
-            skill_id="sk-102",
-            name="FastAPI",
-            taxonomy_category="Backend Frameworks",
-            evidence_snippet="built microservices in Python and FastAPI"
-        ),
-        SkillItem(
-            skill_id="sk-103",
-            name="Docker",
-            taxonomy_category="DevOps & Containers",
-            evidence_snippet="deployed containerized apps on Docker"
-        ),
-        SkillItem(
-            skill_id="sk-104",
-            name="PostgreSQL",
-            taxonomy_category="Databases",
-            evidence_snippet="optimized PostgreSQL queries"
-        ),
-        SkillItem(
-            skill_id="sk-105",
-            name="SAP BTP",
-            taxonomy_category="Cloud Platform",
-            evidence_snippet="completed a cloud course on SAP BTP"
+# ==================================================
+# SKILLS EXTRACTION
+# ==================================================
+
+async def extract_skills_controller(payload):
+    try:
+        employee_id = payload.employee_id
+        profile_text = payload.profile_text
+
+        if not employee_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Employee ID is required"
+            )
+
+        if not profile_text or not profile_text.strip():
+            raise HTTPException(
+                status_code=400,
+                detail="Profile text is required"
+            )
+
+        # ------------------------------------------
+        # MCP integration point
+        # ------------------------------------------
+        # Replace this section with your actual
+        # Skills MCP agent call.
+        #
+        # Expected result:
+        # [
+        #   {
+        #       "skill_id": "SK001",
+        #       "name": "Python",
+        #       "taxonomy_category": "Technical",
+        #       "evidence_snippet": "Built Python microservices"
+        #   }
+        # ]
+
+        extracted_skills = await _call_skills_mcp_stub(
+            profile_text
         )
-    ]
 
-async def extract_skills_controller(payload: ProfileExtractRequest) -> ProfileExtractResponse:
-    if not payload.profile_text.strip():
-        raise HTTPException(status_code=400, detail="Profile text cannot be empty.")
+        # Save extracted skills through model
+        save_extracted_skills(
+            employee_id,
+            extracted_skills
+        )
 
-    extracted = await _call_skills_mcp_stub(payload.profile_text)
-    MOCK_DB["extracted_skills"][payload.employee_id] = extracted
+        return {
+            "employee_id": employee_id,
+            "status": "success",
+            "extracted_skills": extracted_skills,
+            "simulated_data_notice": None
+        }
 
-    record_audit_event(
-        actor="Skills Discovery Agent",
-        action=f"Extracted {len(extracted)} skills from profile for {payload.employee_id}",
-        tool="skills-server:extract_skills, normalize_skills",
-        details="Draft skills generated; awaiting employee confirmation"
+    except HTTPException:
+        raise
+
+    except ValueError as error:
+        raise HTTPException(
+            status_code=404,
+            detail=str(error)
+        )
+
+    except Exception as error:
+        print("Skills extraction error:", error)
+
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to extract skills"
+        )
+
+
+# ==================================================
+# MCP STUB
+# ==================================================
+
+async def _call_skills_mcp_stub(profile_text):
+    """
+    Temporary integration point for the Skills MCP agent.
+
+    Replace this function with the actual MCP call.
+    It intentionally does not return hardcoded skills.
+    """
+
+    raise HTTPException(
+        status_code=501,
+        detail="Skills MCP integration is not configured yet."
     )
 
-    return ProfileExtractResponse(
-        employee_id=payload.employee_id,
-        status="pending_employee_confirmation",
-        extracted_skills=extracted
-    )
 
-async def confirm_skills_controller(payload: SkillConfirmRequest) -> SkillConfirmResponse:
-    if not payload.confirmed_skills:
-        raise HTTPException(status_code=400, detail="At least one skill must be confirmed.")
+# ==================================================
+# CONFIRM SKILLS
+# ==================================================
 
-    MOCK_DB["confirmed_skills"][payload.employee_id] = payload.confirmed_skills
+async def confirm_skills_controller(payload):
+    try:
+        employee_id = payload.employee_id
+        confirmed_skills = payload.confirmed_skills
 
-    skill_names = ", ".join([s.name for s in payload.confirmed_skills])
-    record_audit_event(
-        actor=f"Employee ({payload.employee_id})",
-        action=f"Confirmed {len(payload.confirmed_skills)} skills: [{skill_names}]",
-        tool="audit-server:log_event",
-        details="Human-in-the-loop confirmation completed prior to role matching"
-    )
+        if not employee_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Employee ID is required"
+            )
 
-    return SkillConfirmResponse(
-        employee_id=payload.employee_id,
-        status="confirmed",
-        confirmed_count=len(payload.confirmed_skills),
-        ready_for_matching=True,
-        confirmed_skills=payload.confirmed_skills
-    )
+        if not confirmed_skills:
+            raise HTTPException(
+                status_code=400,
+                detail="At least one skill must be confirmed"
+            )
 
-async def get_skills_state_controller(employee_id: str) -> EmployeeSkillsStateResponse:
-    extracted = MOCK_DB["extracted_skills"].get(employee_id, [])
-    confirmed = MOCK_DB["confirmed_skills"].get(employee_id, [])
+        skills_to_save = []
 
-    return EmployeeSkillsStateResponse(
-        employee_id=employee_id,
-        is_confirmed=len(confirmed) > 0,
-        extracted_skills_draft=extracted,
-        confirmed_skills_final=confirmed
-    )
+        for skill in confirmed_skills:
+            skills_to_save.append({
+                "name": skill.name,
+                "taxonomy_category": (
+                    skill.taxonomy_category or "General"
+                ),
+                "evidence_snippet": (
+                    skill.evidence_snippet or
+                    "Confirmed by employee"
+                )
+            })
 
-async def get_skills_audit_controller() -> Dict[str, Any]:
-    return {
-        "total_events": len(MOCK_DB["audit_log"]),
-        "events": MOCK_DB["audit_log"]
-    }
+        save_confirmed_skills(
+            employee_id,
+            skills_to_save
+        )
+
+        return {
+            "employee_id": employee_id,
+            "status": "success",
+            "confirmed_count": len(skills_to_save),
+            "ready_for_matching": True,
+            "confirmed_skills": skills_to_save
+        }
+
+    except HTTPException:
+        raise
+
+    except ValueError as error:
+        raise HTTPException(
+            status_code=404,
+            detail=str(error)
+        )
+
+    except Exception as error:
+        print("Skills confirmation error:", error)
+
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to confirm skills"
+        )
+
+
+# ==================================================
+# GET EMPLOYEE SKILLS STATE
+# ==================================================
+
+
+async def get_skills_state_controller(employee_id):
+    try:
+        if not employee_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Employee ID is required"
+            )
+
+        employee_state = await run_in_threadpool(
+            get_employee_skills,
+            employee_id
+        )
+
+        return employee_state
+
+    except HTTPException:
+        raise
+
+    except ValueError as error:
+        raise HTTPException(
+            status_code=404,
+            detail=str(error)
+        )
+
+    except Exception as error:
+        print("Get employee skills error:", error)
+
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to retrieve employee skills"
+        )
+
+
+
+# ==================================================
+# GET AUDIT LOGS
+# ==================================================
+
+async def get_skills_audit_controller(employee_id=None):
+    try:
+        logs = get_audit_logs(employee_id)
+
+        return {
+            "status": "success",
+            "count": len(logs),
+            "logs": logs
+        }
+
+    except Exception as error:
+        print("Audit logs error:", error)
+
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to retrieve audit logs"
+        )

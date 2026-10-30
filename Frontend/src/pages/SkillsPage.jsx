@@ -1,605 +1,605 @@
-import { useEffect, useState } from "react"
-import { useNavigate } from "react-router-dom"
 
-import Header from "../components/Header"
-import Sidebar from "../components/Sidebar"
+import { useEffect, useState } from "react";
+import {
+  Brain,
+  Check,
+  CheckCircle2,
+  Plus,
+  Trash2,
+  RefreshCw,
+  AlertCircle,
+  Sparkles,
+  ArrowLeft,
+} from "lucide-react";
+import { Link } from "react-router-dom";
 
 import {
   getEmployeeSkills,
   extractSkills,
   confirmSkills,
-} from "../services/skillsApi"
+} from "../services/skillsApi";
+// Adjust this import path to match your project structure.
+
+
+function getLoggedInUser() {
+  try {
+    const storedUser = sessionStorage.getItem("itn_user");
+
+    return storedUser ? JSON.parse(storedUser) : null;
+  } catch {
+    return null;
+  }
+}
+
 
 export default function SkillsPage() {
-  const navigate = useNavigate()
+  const [user] = useState(getLoggedInUser);
 
-  const [employeeId, setEmployeeId] = useState("emp-ananya")
-  const [skills, setSkills] = useState([])
-  const [confirmed, setConfirmed] = useState(false)
+  const employeeId = user?.employeeId || user?.employee_id || "";
 
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState("")
-  const [newSkill, setNewSkill] = useState("")
+  const profileText =
+    user?.profileText ||
+    user?.profile_text ||
+    user?.profile?.profile_text ||
+    "";
 
-  const profileText = `
-Ananya Rao, 28, Software Engineer returning from a 14-month caregiving break.
-Previously built microservices in Python and FastAPI, deployed containerized apps
-on Docker, and optimized PostgreSQL queries. Recently completed a cloud course
-on SAP BTP.
-`
+  const [employee, setEmployee] = useState(null);
+  const [draftSkills, setDraftSkills] = useState([]);
+  const [confirmedSkills, setConfirmedSkills] = useState([]);
 
-  // --------------------------------------------------
-  // Get employee ID from login session
-  // --------------------------------------------------
+  const [loading, setLoading] = useState(true);
+  const [extracting, setExtracting] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    const storedUser = sessionStorage.getItem("itn_user")
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
-    if (storedUser) {
-      try {
-        const user = JSON.parse(storedUser)
+  const [newSkill, setNewSkill] = useState("");
+  const [newCategory, setNewCategory] = useState("General");
 
-        if (user.employeeId) {
-          setEmployeeId(user.employeeId)
-        }
-      } catch {
-        // Keep default employee ID
-      }
-    }
-  }, [])
 
-  // --------------------------------------------------
-  // Load skills
-  // --------------------------------------------------
+  // ==========================================
+  // LOAD EXISTING SKILLS
+  // ==========================================
 
   useEffect(() => {
+    let active = true;
+
     async function loadSkills() {
+      if (!employeeId) {
+        setError("Employee ID is missing. Please log in again.");
+        setLoading(false);
+        return;
+      }
+
       try {
-        setLoading(true)
-        setError("")
+        setLoading(true);
+        setError("");
 
-        const data = await getEmployeeSkills(employeeId)
+        const data = await getEmployeeSkills(employeeId);
 
-        console.log("GET skills response:", data)
+        if (!active) return;
 
-        // Backend returns:
-        // extracted_skills_draft
-        // confirmed_skills_final
-        // is_confirmed
-
-        let backendSkills = data.extracted_skills_draft || []
-
-        const confirmedSkills =
-          data.confirmed_skills_final || []
-
-        // ------------------------------------------------
-        // If confirmed skills exist, display those
-        // ------------------------------------------------
-
-        if (
-          data.is_confirmed &&
-          confirmedSkills.length > 0
-        ) {
-          backendSkills = confirmedSkills.map(
-            (skill, index) => ({
-              id: `confirmed-${index}`,
-              name: skill.name,
-              category:
-                skill.taxonomy_category || "General",
-              evidence:
-                skill.evidence_snippet ||
-                "Confirmed by employee",
-            })
-          )
-
-          setConfirmed(true)
-        } else {
-          // ------------------------------------------------
-          // Otherwise display extracted draft skills
-          // ------------------------------------------------
-
-          backendSkills = backendSkills.map(
-            (skill, index) => ({
-              id:
-                skill.skill_id ||
-                `skill-${index}`,
-              name: skill.name,
-              category:
-                skill.taxonomy_category || "General",
-              evidence:
-                skill.evidence_snippet || "",
-            })
-          )
-
-          setConfirmed(false)
-        }
-
-        // ------------------------------------------------
-        // If backend has no extracted skills yet,
-        // run extraction from frontend.
-        // ------------------------------------------------
-
-        if (
-          backendSkills.length === 0 &&
-          !data.is_confirmed
-        ) {
-          const extractionResult =
-            await extractSkills({
-              employee_id: employeeId,
-              profile_text: profileText,
-            })
-
-          console.log(
-            "POST extract response:",
-            extractionResult
-          )
-
-          const extracted =
-            extractionResult.extracted_skills || []
-
-          backendSkills = extracted.map(
-            (skill, index) => ({
-              id:
-                skill.skill_id ||
-                `skill-${index}`,
-              name: skill.name,
-              category:
-                skill.taxonomy_category || "General",
-              evidence:
-                skill.evidence_snippet || "",
-            })
-          )
-        }
-
-        setSkills(backendSkills)
+        setEmployee(data.employee || null);
+        setDraftSkills(data.extracted_skills_draft || []);
+        setConfirmedSkills(data.confirmed_skills_final || []);
       } catch (err) {
-        console.error("Skills page error:", err)
-
-        setError(
-          err.message ||
-            "Unable to load your skills."
-        )
+        if (active) {
+          setError(err.message || "Unable to load skills.");
+        }
       } finally {
-        setLoading(false)
+        if (active) {
+          setLoading(false);
+        }
       }
     }
 
-    loadSkills()
-  }, [employeeId])
+    loadSkills();
 
-  // --------------------------------------------------
-  // Add skill
-  // --------------------------------------------------
+    return () => {
+      active = false;
+    };
+  }, [employeeId]);
 
-  function handleAddSkill() {
-    const trimmedSkill = newSkill.trim()
 
-    if (!trimmedSkill) {
-      return
-    }
+  // ==========================================
+  // EXTRACT SKILLS
+  // ==========================================
 
-    const exists = skills.some(
-      (skill) =>
-        skill.name.toLowerCase() ===
-        trimmedSkill.toLowerCase()
-    )
-
-    if (exists) {
-      alert("This skill already exists.")
-      return
-    }
-
-    setSkills((previous) => [
-      ...previous,
-      {
-        id: `manual-${Date.now()}`,
-        name: trimmedSkill,
-        category: "General",
-        evidence: "Added manually by employee",
-      },
-    ])
-
-    setNewSkill("")
-    setConfirmed(false)
-  }
-
-  // --------------------------------------------------
-  // Remove skill
-  // --------------------------------------------------
-
-  function handleRemoveSkill(skillId) {
-    setSkills((previous) =>
-      previous.filter(
-        (skill) => skill.id !== skillId
-      )
-    )
-
-    setConfirmed(false)
-  }
-
-  // --------------------------------------------------
-  // Confirm skills
-  // --------------------------------------------------
-
-  async function handleConfirmSkills() {
-    if (skills.length === 0) {
-      alert(
-        "Please add at least one skill before confirming."
-      )
-      return
+  async function handleExtractSkills() {
+    if (!profileText.trim()) {
+      setError(
+        "Your profile text is not available in your login data. Please make sure your employee profile contains profile_text."
+      );
+      return;
     }
 
     try {
-      setSaving(true)
-      setError("")
+      setExtracting(true);
+      setError("");
+      setSuccess("");
 
-      // IMPORTANT:
-      // Backend expects "confirmed_skills"
-
-      const payload = {
+      const data = await extractSkills({
         employee_id: employeeId,
+        profile_text: profileText,
+      });
 
-        confirmed_skills: skills.map(
-          (skill) => ({
-            name: skill.name,
-            taxonomy_category:
-              skill.category || "General",
-            evidence_snippet:
-              skill.evidence ||
-              "Confirmed/Added by employee",
-          })
-        ),
-      }
+      const extracted = data.extracted_skills || [];
 
-      console.log(
-        "Confirm skills payload:",
-        payload
-      )
+      setDraftSkills(extracted);
+      setConfirmedSkills([]);
+      setEmployee((previous) =>
+        previous
+          ? {
+              ...previous,
+              is_confirmed: false,
+              ready_for_matching: false,
+            }
+          : previous
+      );
 
-      const result =
-        await confirmSkills(payload)
-
-      console.log(
-        "POST confirm response:",
-        result
-      )
-
-      setConfirmed(true)
+      setSuccess(`${extracted.length} skills extracted successfully.`);
     } catch (err) {
-      console.error(
-        "Confirm skills error:",
-        err
-      )
-
-      setError(
-        err.message ||
-          "Unable to confirm skills."
-      )
+      setError(err.message || "Skill extraction failed.");
     } finally {
-      setSaving(false)
+      setExtracting(false);
     }
   }
 
-  // --------------------------------------------------
-  // Loading
-  // --------------------------------------------------
+
+  // ==========================================
+  // ADD A SKILL
+  // ==========================================
+
+  function handleAddSkill() {
+    const name = newSkill.trim();
+
+    if (!name) return;
+
+    const alreadyExists = draftSkills.some(
+      (skill) => skill.name.toLowerCase() === name.toLowerCase()
+    );
+
+    if (alreadyExists) {
+      setError("This skill already exists.");
+      return;
+    }
+
+    const newItem = {
+      skill_id: `manual-${Date.now()}`,
+      name,
+      taxonomy_category: newCategory,
+      evidence_snippet: "Added by employee",
+    };
+
+    setDraftSkills((previous) => [...previous, newItem]);
+
+    setNewSkill("");
+    setNewCategory("General");
+    setError("");
+    setSuccess("Skill added. Confirm your changes to save them.");
+  }
+
+
+  // ==========================================
+  // REMOVE A SKILL
+  // ==========================================
+
+  function handleRemoveSkill(skillId) {
+    setDraftSkills((previous) =>
+      previous.filter((skill) => skill.skill_id !== skillId)
+    );
+
+    setSuccess("Skill removed from the review list.");
+  }
+
+
+  // ==========================================
+  // CONFIRM SKILLS
+  // ==========================================
+
+  async function handleConfirmSkills() {
+    if (draftSkills.length === 0) {
+      setError("Add or extract at least one skill before confirming.");
+      return;
+    }
+
+    try {
+      setSaving(true);
+      setError("");
+      setSuccess("");
+
+      const payload = {
+        employee_id: employeeId,
+        confirmed_skills: draftSkills.map((skill) => ({
+          name: skill.name,
+          taxonomy_category: skill.taxonomy_category || "General",
+          evidence_snippet: skill.evidence_snippet || "",
+        })),
+      };
+
+      const data = await confirmSkills(payload);
+
+      setConfirmedSkills(data.confirmed_skills || payload.confirmed_skills);
+
+      setEmployee((previous) =>
+        previous
+          ? {
+              ...previous,
+              is_confirmed: true,
+              ready_for_matching: Boolean(data.ready_for_matching),
+            }
+          : previous
+      );
+
+      setSuccess("Your skills have been confirmed successfully.");
+    } catch (err) {
+      setError(err.message || "Unable to confirm skills.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+
+  // ==========================================
+  // LOADING STATE
+  // ==========================================
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50">
-        <Header />
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="text-center">
+          <RefreshCw
+            size={30}
+            className="mx-auto animate-spin text-indigo-600"
+          />
 
-        <div className="flex">
-          <Sidebar />
-
-          <main className="flex min-h-[calc(100vh-4rem)] flex-1 items-center justify-center">
-            <div className="text-center">
-              <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-slate-900" />
-
-              <p className="text-sm font-medium text-slate-600">
-                Loading your skill profile...
-              </p>
-            </div>
-          </main>
+          <p className="mt-3 text-sm text-slate-500">
+            Loading your skills...
+          </p>
         </div>
       </div>
-    )
+    );
   }
 
-  // --------------------------------------------------
-  // Main page
-  // --------------------------------------------------
+
+  // ==========================================
+  // ERROR STATE
+  // ==========================================
+
+  if (error && !employee && !draftSkills.length && !confirmedSkills.length) {
+    return (
+      <div className="mx-auto mt-12 max-w-xl rounded-2xl border border-red-200 bg-red-50 p-6 text-center">
+        <AlertCircle className="mx-auto text-red-600" size={32} />
+
+        <h2 className="mt-3 font-semibold text-red-800">
+          Unable to load skills
+        </h2>
+
+        <p className="mt-2 text-sm text-red-700">{error}</p>
+
+        <Link
+          to="/dashboard"
+          className="mt-5 inline-block rounded-xl bg-indigo-600 px-5 py-2 text-sm font-medium text-white"
+        >
+          Back to Dashboard
+        </Link>
+      </div>
+    );
+  }
+
+
+  const isConfirmed = Boolean(employee?.is_confirmed);
+
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <Header />
+    <main className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 lg:px-10">
+      <div className="mx-auto max-w-5xl">
 
-      <div className="flex">
-        <Sidebar />
+        {/* HEADER */}
+        <div className="mb-8">
+          <Link
+            to="/dashboard"
+            className="mb-5 inline-flex items-center gap-2 text-sm text-slate-500 hover:text-indigo-600"
+          >
+            <ArrowLeft size={16} />
+            Back to Dashboard
+          </Link>
 
-        <main className="min-w-0 flex-1">
-          <div className="mx-auto max-w-7xl p-5 sm:p-7 lg:p-9">
-
-            {/* Breadcrumb */}
-
-            <div className="mb-6 flex items-center gap-2 text-sm">
-              <button
-                onClick={() =>
-                  navigate("/dashboard")
-                }
-                className="text-slate-500 hover:text-slate-900"
-              >
-                Dashboard
-              </button>
-
-              <span className="text-slate-400">
-                /
-              </span>
-
-              <span className="font-medium text-slate-900">
-                Skills Discovery
-              </span>
-            </div>
-
-            {/* Header */}
-
-            <div className="mb-8">
-              <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
-                Step 01 · Skills Discovery
+          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+            <div>
+              <p className="text-sm font-medium text-indigo-600">
+                SKILLS DISCOVERY
               </p>
 
-              <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-                Your Skill Profile
+              <h1 className="mt-2 text-3xl font-bold text-slate-900">
+                Review Your Skills
               </h1>
 
-              <p className="mt-2 max-w-2xl text-slate-500">
-                Review the skills identified from your
-                professional profile and confirm the
-                skills you want to use for role matching.
+              <p className="mt-2 text-slate-500">
+                Review the skills identified from your employee profile.
+                You remain in control of what gets confirmed.
               </p>
             </div>
 
-            {/* Error */}
+            <div
+              className={`inline-flex items-center gap-2 self-start rounded-full px-4 py-2 text-sm font-medium ${
+                isConfirmed
+                  ? "bg-emerald-50 text-emerald-700"
+                  : "bg-amber-50 text-amber-700"
+              }`}
+            >
+              {isConfirmed ? (
+                <CheckCircle2 size={17} />
+              ) : (
+                <AlertCircle size={17} />
+              )}
 
-            {error && (
-              <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-5 py-4">
-                <p className="text-sm font-medium text-red-700">
-                  {error}
-                </p>
-              </div>
-            )}
-
-            {/* Employee */}
-
-            <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                    Employee
-                  </p>
-
-                  <h2 className="mt-1 text-xl font-semibold text-slate-900">
-                    Ananya Rao
-                  </h2>
-
-                  <p className="mt-1 text-sm text-slate-500">
-                    Software Engineer · {employeeId}
-                  </p>
-                </div>
-
-                <div
-                  className={`rounded-full px-4 py-2 text-sm font-medium ${
-                    confirmed
-                      ? "bg-emerald-50 text-emerald-700"
-                      : "bg-amber-50 text-amber-700"
-                  }`}
-                >
-                  {confirmed
-                    ? "Skills Confirmed"
-                    : "Awaiting Confirmation"}
-                </div>
-              </div>
+              {isConfirmed ? "Skills confirmed" : "Review pending"}
             </div>
-
-            {/* Skills card */}
-
-            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-
-              <div className="border-b border-slate-200 px-6 py-5">
-                <h2 className="font-semibold text-slate-900">
-                  Identified Skills
-                </h2>
-
-                <p className="mt-1 text-sm text-slate-500">
-                  {skills.length} skills identified
-                </p>
-              </div>
-
-              {/* Skills */}
-
-              <div className="divide-y divide-slate-100">
-
-                {skills.length === 0 ? (
-                  <div className="px-6 py-12 text-center">
-                    <p className="font-medium text-slate-700">
-                      No skills found
-                    </p>
-
-                    <p className="mt-1 text-sm text-slate-500">
-                      No skills are currently available
-                      for this employee.
-                    </p>
-                  </div>
-                ) : (
-                  skills.map((skill) => (
-                    <div
-                      key={skill.id}
-                      className="flex flex-col gap-4 px-6 py-5 sm:flex-row sm:items-start sm:justify-between"
-                    >
-                      <div className="min-w-0">
-
-                        <div className="flex flex-wrap items-center gap-2">
-
-                          <h3 className="font-semibold text-slate-900">
-                            {skill.name}
-                          </h3>
-
-                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
-                            {skill.category}
-                          </span>
-
-                        </div>
-
-                        <p className="mt-2 text-sm leading-6 text-slate-500">
-                          <span className="font-medium text-slate-700">
-                            Evidence:
-                          </span>{" "}
-                          {skill.evidence}
-                        </p>
-                      </div>
-
-                      <button
-                        onClick={() =>
-                          handleRemoveSkill(
-                            skill.id
-                          )
-                        }
-                        className="shrink-0 rounded-lg px-3 py-2 text-sm font-medium text-slate-500 hover:bg-red-50 hover:text-red-600"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              {/* Add */}
-
-              <div className="border-t border-slate-200 bg-slate-50 px-6 py-5">
-
-                <p className="mb-3 text-sm font-semibold text-slate-800">
-                  Add a skill
-                </p>
-
-                <div className="flex flex-col gap-3 sm:flex-row">
-
-                  <input
-                    type="text"
-                    value={newSkill}
-                    onChange={(event) =>
-                      setNewSkill(
-                        event.target.value
-                      )
-                    }
-                    onKeyDown={(event) => {
-                      if (
-                        event.key === "Enter"
-                      ) {
-                        handleAddSkill()
-                      }
-                    }}
-                    placeholder="e.g. Git, React, SQL"
-                    className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
-                  />
-
-                  <button
-                    onClick={handleAddSkill}
-                    className="rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
-                  >
-                    Add Skill
-                  </button>
-
-                </div>
-              </div>
-
-              {/* Actions */}
-
-              <div className="flex flex-col gap-4 border-t border-slate-200 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
-
-                <div>
-                  <p className="text-sm font-medium text-slate-700">
-                    Human confirmation required
-                  </p>
-
-                  <p className="mt-1 text-xs text-slate-500">
-                    Skills are only used for matching
-                    after employee confirmation.
-                  </p>
-                </div>
-
-                <div className="flex flex-col gap-3 sm:flex-row">
-
-                  <button
-                    onClick={() =>
-                      navigate("/dashboard")
-                    }
-                    className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                  >
-                    Back
-                  </button>
-
-                  <button
-                    onClick={
-                      handleConfirmSkills
-                    }
-                    disabled={
-                      saving ||
-                      skills.length === 0 ||
-                      confirmed
-                    }
-                    className="rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {saving
-                      ? "Confirming..."
-                      : confirmed
-                        ? "Skills Confirmed"
-                        : "Confirm Skills"}
-                  </button>
-
-                  <button
-                    onClick={() =>
-                      navigate("/matching")
-                    }
-                    disabled={!confirmed}
-                    className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    Continue to Matching →
-                  </button>
-
-                </div>
-              </div>
-            </div>
-
-            {/* Responsible AI */}
-
-            <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5">
-
-              <div className="flex gap-3">
-
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-sm">
-                  ✓
-                </div>
-
-                <div>
-                  <p className="text-sm font-semibold text-slate-800">
-                    Responsible AI
-                  </p>
-
-                  <p className="mt-1 text-sm leading-6 text-slate-500">
-                    AI identifies potential skills, but the
-                    employee remains in control of which
-                    skills are confirmed before matching.
-                  </p>
-                </div>
-
-              </div>
-            </div>
-
           </div>
-        </main>
+        </div>
+
+
+        {/* EMPLOYEE DETAILS */}
+        <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-sm text-slate-500">Employee</p>
+
+          <h2 className="mt-1 text-lg font-bold text-slate-900">
+            {employee?.full_name || "Employee"}
+          </h2>
+
+          <p className="mt-1 text-sm text-slate-500">
+            {employee?.current_role || "Role not provided"}
+            {" · "}
+            ID: {employee?.employee_id || employeeId}
+          </p>
+        </section>
+
+
+        {/* NOTIFICATIONS */}
+        {error && (
+          <div className="mb-5 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            <AlertCircle size={18} className="mt-0.5 shrink-0" />
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="mb-5 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
+            <CheckCircle2 size={18} className="mt-0.5 shrink-0" />
+            {success}
+          </div>
+        )}
+
+
+        {/* EXTRACTION */}
+        <section className="mb-6 rounded-2xl border border-indigo-100 bg-indigo-50/60 p-5">
+          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+            <div className="flex gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-indigo-600">
+                <Sparkles size={22} />
+              </div>
+
+              <div>
+                <h3 className="font-semibold text-slate-900">
+                  AI Skills Extraction
+                </h3>
+
+                <p className="mt-1 text-sm text-slate-600">
+                  Extract skills from your employee profile.
+                  You can review and edit the results before confirming.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={handleExtractSkills}
+              disabled={extracting || saving}
+              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {extracting ? (
+                <>
+                  <RefreshCw size={17} className="animate-spin" />
+                  Extracting...
+                </>
+              ) : (
+                <>
+                  <Brain size={17} />
+                  Extract Skills
+                </>
+              )}
+            </button>
+          </div>
+        </section>
+
+
+        {/* SKILL LIST */}
+        <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <div className="mb-5 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">
+                Extracted Skills
+              </h2>
+
+              <p className="mt-1 text-sm text-slate-500">
+                Add or remove skills before confirming.
+              </p>
+            </div>
+
+            <span className="w-fit rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
+              {draftSkills.length} skills
+            </span>
+          </div>
+
+
+          {draftSkills.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-5 py-10 text-center">
+              <Brain className="mx-auto text-slate-400" size={32} />
+
+              <h3 className="mt-3 font-semibold text-slate-700">
+                No extracted skills yet
+              </h3>
+
+              <p className="mt-1 text-sm text-slate-500">
+                Use the Extract Skills button to identify skills from your profile.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {draftSkills.map((skill) => (
+                <div
+                  key={skill.skill_id}
+                  className="flex flex-col justify-between gap-3 rounded-xl border border-slate-200 p-4 sm:flex-row sm:items-center"
+                >
+                  <div className="min-w-0">
+                    <h3 className="font-semibold text-slate-800">
+                      {skill.name}
+                    </h3>
+
+                    <p className="mt-1 text-xs text-indigo-600">
+                      {skill.taxonomy_category || "General"}
+                    </p>
+
+                    {skill.evidence_snippet && (
+                      <p className="mt-2 text-sm text-slate-500">
+                        {skill.evidence_snippet}
+                      </p>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={() => handleRemoveSkill(skill.skill_id)}
+                    disabled={saving}
+                    aria-label={`Remove ${skill.name}`}
+                    className="inline-flex items-center justify-center gap-2 self-start rounded-lg border border-red-200 px-3 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50 sm:self-center"
+                  >
+                    <Trash2 size={16} />
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+
+          {/* ADD SKILL */}
+          <div className="mt-6 border-t border-slate-100 pt-5">
+            <h3 className="mb-3 font-semibold text-slate-800">
+              Add a skill manually
+            </h3>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_auto]">
+              <input
+                value={newSkill}
+                onChange={(event) => setNewSkill(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") handleAddSkill();
+                }}
+                placeholder="Enter skill name"
+                className="rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+              />
+
+              <select
+                value={newCategory}
+                onChange={(event) => setNewCategory(event.target.value)}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-500"
+              >
+                <option>General</option>
+                <option>Programming</option>
+                <option>AI</option>
+                <option>Database</option>
+                <option>Communication</option>
+                <option>Leadership</option>
+                <option>Management</option>
+                <option>Design</option>
+              </select>
+
+              <button
+                onClick={handleAddSkill}
+                disabled={!newSkill.trim() || saving}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-indigo-200 px-5 py-3 text-sm font-semibold text-indigo-700 hover:bg-indigo-50 disabled:opacity-50"
+              >
+                <Plus size={17} />
+                Add
+              </button>
+            </div>
+          </div>
+
+
+          {/* CONFIRM */}
+          <div className="mt-6 flex flex-col justify-between gap-4 border-t border-slate-100 pt-5 sm:flex-row sm:items-center">
+            <div>
+              <p className="text-sm font-semibold text-slate-800">
+                Ready to confirm your skills?
+              </p>
+
+              <p className="mt-1 text-xs text-slate-500">
+                Only the skills in this list will be submitted.
+              </p>
+            </div>
+
+            <button
+              onClick={handleConfirmSkills}
+              disabled={saving || extracting || draftSkills.length === 0}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {saving ? (
+                <>
+                  <RefreshCw size={17} className="animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Check size={18} />
+                  Confirm Skills
+                </>
+              )}
+            </button>
+          </div>
+        </section>
+
+
+        {/* CONFIRMED SKILLS */}
+        <section className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
+          <div className="mb-4 flex items-center gap-3">
+            <div className="rounded-xl bg-emerald-50 p-3 text-emerald-600">
+              <CheckCircle2 size={21} />
+            </div>
+
+            <div>
+              <h2 className="font-bold text-slate-900">
+                Confirmed Skills
+              </h2>
+
+              <p className="text-sm text-slate-500">
+                Skills saved as confirmed in your employee record.
+              </p>
+            </div>
+          </div>
+
+          {confirmedSkills.length === 0 ? (
+            <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">
+              You have not confirmed any skills yet.
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {confirmedSkills.map((skill, index) => (
+                <span
+                  key={`${skill.name}-${index}`}
+                  className="rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm text-emerald-800"
+                >
+                  {skill.name}
+                  <span className="ml-2 text-xs opacity-60">
+                    {skill.taxonomy_category}
+                  </span>
+                </span>
+              ))}
+            </div>
+          )}
+        </section>
+
       </div>
-    </div>
-  )
+    </main>
+  );
 }
