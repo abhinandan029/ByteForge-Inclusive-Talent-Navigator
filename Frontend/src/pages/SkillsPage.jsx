@@ -1,482 +1,439 @@
-import { useState } from "react"
-import { Link } from "react-router-dom"
+
+import { useEffect, useState } from "react"
+import { useNavigate } from "react-router-dom"
+
 import Header from "../components/Header"
 import Sidebar from "../components/Sidebar"
+
 import {
-  employeeData,
-  extractedSkills,
-} from "../data/dummyData"
+  getEmployee,
+  getEmployeeSkills
+} from "../services/skillsApi"
 
 export default function SkillsPage() {
+  const navigate = useNavigate()
 
-  const [skills, setSkills] = useState(extractedSkills)
+  const [employee, setEmployee] = useState(null)
+  const [skills, setSkills] = useState([])
+
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+
   const [newSkill, setNewSkill] = useState("")
   const [confirmed, setConfirmed] = useState(false)
 
-  const removeSkill = (id) => {
-    setSkills((current) =>
-      current.filter((skill) => skill.id !== id)
+  // Fetch employee profile and skills from backend
+  useEffect(() => {
+    async function fetchSkillsPageData() {
+      try {
+        setLoading(true)
+        setError("")
+
+        const [employeeData, skillsData] = await Promise.all([
+          getEmployee("EMP-1024"),
+          getEmployeeSkills("EMP-1024")
+        ])
+
+        setEmployee(employeeData)
+        setSkills(skillsData.skills)
+
+      } catch (err) {
+        setError(err.message || "Unable to load skill profile")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchSkillsPageData()
+  }, [])
+
+  // Add a new skill
+  const handleAddSkill = () => {
+    const trimmedSkill = newSkill.trim()
+
+    if (!trimmedSkill) return
+
+    const alreadyExists = skills.some(
+      skill => skill.name.toLowerCase() === trimmedSkill.toLowerCase()
     )
-  }
 
-  const addSkill = () => {
-
-    const value = newSkill.trim()
-
-    if (!value) return
-
-    const exists = skills.some(
-      (skill) =>
-        skill.name.toLowerCase() === value.toLowerCase()
-    )
-
-    if (exists) {
-      setNewSkill("")
+    if (alreadyExists) {
+      alert("This skill already exists")
       return
     }
 
-    setSkills((current) => [
-      ...current,
-      {
-        id: Date.now(),
-        name: value,
-        category: "Employee added",
-        confidence: null,
-        evidence: "Added by employee",
-      },
-    ])
+    const newSkillData = {
+      id: Date.now(),
+      name: trimmedSkill,
+      category: "Additional Skill",
+      confidence: 100,
+      evidence: "Added by employee"
+    }
 
+    setSkills(previousSkills => [...previousSkills, newSkillData])
     setNewSkill("")
+    setConfirmed(false)
   }
 
-  const confirmSkills = () => {
+  // Remove a skill
+  const handleRemoveSkill = (skillId) => {
+    setSkills(previousSkills =>
+      previousSkills.filter(skill => skill.id !== skillId)
+    )
+
+    setConfirmed(false)
+  }
+
+  // Confirm skills
+  const handleConfirmSkills = () => {
+    if (skills.length === 0) {
+      alert("Please add at least one skill before confirming")
+      return
+    }
+
     setConfirmed(true)
+  }
+
+  // Loading screen
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-slate-600 font-medium">
+            Loading skill profile...
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  // Error screen
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="bg-white p-8 rounded-xl shadow-sm border border-slate-200 text-center max-w-md">
+          <p className="text-red-600 font-medium mb-4">
+            {error}
+          </p>
+
+          <button
+            onClick={() => window.location.reload()}
+            className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (
     <div className="min-h-screen bg-slate-50">
 
+      {/* Top Header */}
       <Header />
 
-      <div className="flex">
+      <div className="flex min-h-[calc(100vh-64px)]">
 
+        {/* Left Sidebar */}
         <Sidebar />
 
-        <main className="min-w-0 flex-1">
+        {/* Main Content */}
+        <main className="flex-1 min-w-0">
 
-          <div className="mx-auto max-w-7xl p-5 sm:p-7 lg:p-9">
+          <div className="max-w-7xl mx-auto p-5 sm:p-7 lg:p-9">
 
             {/* Breadcrumb */}
-
-            <div className="mb-6 flex items-center gap-2 text-xs text-slate-400">
-
-              <Link
-                to="/dashboard"
-                className="hover:text-slate-700"
-              >
-                Dashboard
-              </Link>
-
+            <div className="flex items-center gap-2 text-sm text-slate-500 mb-6">
+              <span>Dashboard</span>
               <span>/</span>
-
-              <span className="font-medium text-slate-600">
-                Skill Profile
-              </span>
-
+              <span className="text-blue-600 font-medium">Skills</span>
             </div>
 
-
-            {/* Heading */}
-
-            <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-
+            {/* Page Heading */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
               <div>
+                <p className="text-sm font-semibold text-blue-600 mb-2">
+                  STEP 01 · SKILLS DISCOVERY
+                </p>
 
-                <div className="mb-2 flex items-center gap-2">
-
-                  <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-[#0a6ed1]">
-                    Skills Discovery
-                  </span>
-
-                  <span className="text-xs text-slate-400">
-                    Step 1 of your talent journey
-                  </span>
-
-                </div>
-
-                <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
+                <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
                   Your Skill Profile
                 </h1>
 
-                <p className="mt-2 max-w-2xl text-sm leading-5 text-slate-500">
-                  Review the capabilities identified from your profile.
-                  You stay in control of what gets added to your
-                  confirmed skill profile.
+                <p className="text-slate-500 mt-2">
+                  Review the skills identified from your professional profile.
                 </p>
-
               </div>
 
-
-              <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
-
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 text-[#0a6ed1]">
-                  ✦
-                </div>
-
-                <div>
-
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                    AI assistance
-                  </p>
-
-                  <p className="text-xs font-medium text-slate-700">
-                    Recommendations require confirmation
-                  </p>
-
-                </div>
-
+              <div className="flex items-center gap-2 text-sm bg-white border border-slate-200 rounded-lg px-4 py-2.5">
+                <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                <span className="text-slate-600">
+                  Skills Discovery
+                </span>
               </div>
-
             </div>
 
-
             {/* Employee Profile */}
+            {employee && (
+              <div className="bg-white border border-slate-200 rounded-2xl p-6 mb-6">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-5">
 
-            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                  <div className="w-16 h-16 rounded-2xl bg-blue-100 flex items-center justify-center text-2xl font-bold text-blue-700">
+                    {employee.name
+                      .split(" ")
+                      .map(word => word[0])
+                      .join("")}
+                  </div>
 
-              <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-100 to-blue-50 text-lg font-semibold text-[#0a6ed1]">
-                  AR
-                </div>
-
-                <div className="min-w-0 flex-1">
-
-                  <div className="flex flex-wrap items-center gap-2">
-
-                    <h2 className="text-lg font-semibold text-slate-900">
-                      {employeeData.name}
+                  <div className="flex-1">
+                    <h2 className="text-xl font-bold text-slate-900">
+                      {employee.name}
                     </h2>
 
-                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-medium text-slate-500">
-                      {employeeData.id}
-                    </span>
+                    <p className="text-slate-500 text-sm mt-1">
+                      {employee.role} · {employee.department}
+                    </p>
 
+                    <p className="text-slate-400 text-sm mt-1">
+                      {employee.id} · {employee.location}
+                    </p>
                   </div>
 
-                  <p className="mt-1 text-sm text-slate-500">
-                    {employeeData.role} · {employeeData.department}
-                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
 
-                  <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-xs text-slate-400">
+                    <div>
+                      <p className="text-xs text-slate-400">Experience</p>
+                      <p className="font-semibold text-slate-800 mt-1">
+                        {employee.experience}
+                      </p>
+                    </div>
 
-                    <span>
-                      📍 {employeeData.location}
-                    </span>
+                    <div>
+                      <p className="text-xs text-slate-400">Career Break</p>
+                      <p className="font-semibold text-slate-800 mt-1">
+                        {employee.careerBreak}
+                      </p>
+                    </div>
 
-                    <span>
-                      💼 {employeeData.experience}
-                    </span>
-
-                    <span>
-                      Grade {employeeData.grade}
-                    </span>
+                    <div>
+                      <p className="text-xs text-slate-400">Grade</p>
+                      <p className="font-semibold text-slate-800 mt-1">
+                        {employee.grade}
+                      </p>
+                    </div>
 
                   </div>
-
                 </div>
-
-
-                <div className="rounded-xl bg-slate-50 px-4 py-3">
-
-                  <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">
-                    Profile status
-                  </p>
-
-                  <div className="mt-1 flex items-center gap-2">
-
-                    <span
-                      className={`h-2 w-2 rounded-full ${
-                        confirmed
-                          ? "bg-emerald-500"
-                          : "bg-amber-400"
-                      }`}
-                    />
-
-                    <span className="text-xs font-semibold text-slate-700">
-                      {confirmed
-                        ? "Skills confirmed"
-                        : "Awaiting confirmation"}
-                    </span>
-
-                  </div>
-
-                </div>
-
               </div>
+            )}
 
-            </section>
+            {/* AI Notice */}
+            <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-6 flex gap-3">
+              <div className="text-blue-600 text-xl">✦</div>
 
+              <div>
+                <h3 className="font-semibold text-blue-900">
+                  AI-assisted Skills Discovery
+                </h3>
 
-            {/* AI section */}
+                <p className="text-sm text-blue-800 mt-1">
+                  These skills are suggested based on your professional
+                  profile. Please review and confirm them. You remain in
+                  control of your skill profile.
+                </p>
+              </div>
+            </div>
 
-            <section className="mt-6">
+            {/* Skills Section */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-6">
 
-              <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
                 <div>
+                  <h2 className="text-lg font-bold text-slate-900">
+                    Discovered Skills
+                  </h2>
 
-                  <div className="flex items-center gap-2">
-
-                    <h2 className="text-base font-semibold text-slate-900">
-                      Skills identified from your profile
-                    </h2>
-
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">
-                      {skills.length}
-                    </span>
-
-                  </div>
-
-                  <p className="mt-1 text-xs text-slate-500">
-                    Review each skill and remove anything that doesn't
-                    accurately represent your current capabilities.
+                  <p className="text-sm text-slate-500 mt-1">
+                    {skills.length} skills identified
                   </p>
-
                 </div>
 
+                <span className="text-xs font-medium bg-slate-100 text-slate-600 px-3 py-1.5 rounded-full">
+                  Awaiting confirmation
+                </span>
               </div>
 
+              {/* Skill Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-              {/* Skills grid */}
-
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-
-                {skills.map((skill) => (
-
+                {skills.map(skill => (
                   <div
                     key={skill.id}
-                    className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-blue-200 hover:shadow-md"
+                    className="border border-slate-200 rounded-xl p-4 hover:border-blue-300 transition"
                   >
 
-                    <div className="flex items-start justify-between">
+                    <div className="flex items-start justify-between gap-3">
 
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-sm font-semibold text-[#0a6ed1]">
-                        {skill.name.charAt(0)}
+                      <div>
+                        <h3 className="font-semibold text-slate-900">
+                          {skill.name}
+                        </h3>
+
+                        <p className="text-xs text-slate-500 mt-1">
+                          {skill.category}
+                        </p>
                       </div>
 
                       <button
-                        onClick={() => removeSkill(skill.id)}
-                        className="rounded-lg px-2 py-1 text-[11px] font-medium text-slate-400 opacity-0 transition hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
+                        onClick={() => handleRemoveSkill(skill.id)}
+                        className="text-slate-400 hover:text-red-600 text-sm"
+                        title="Remove skill"
                       >
                         Remove
                       </button>
 
                     </div>
 
-
+                    {/* Confidence */}
                     <div className="mt-4">
 
-                      <div className="flex items-center justify-between gap-2">
-
-                        <h3 className="font-semibold text-slate-800">
-                          {skill.name}
-                        </h3>
-
-                        <span className="rounded-full bg-slate-50 px-2 py-1 text-[9px] font-medium text-slate-400">
-                          {skill.category}
+                      <div className="flex justify-between text-xs mb-2">
+                        <span className="text-slate-500">
+                          AI confidence
                         </span>
 
+                        <span className="font-semibold text-slate-700">
+                          {skill.confidence}%
+                        </span>
                       </div>
 
-                      <p className="mt-2 min-h-10 text-xs leading-5 text-slate-500">
-                        {skill.evidence}
+                      <div className="w-full bg-slate-100 rounded-full h-2">
+                        <div
+                          className="bg-blue-600 h-2 rounded-full"
+                          style={{ width: `${skill.confidence}%` }}
+                        ></div>
+                      </div>
+
+                    </div>
+
+                    {/* Evidence */}
+                    <div className="mt-4 pt-3 border-t border-slate-100">
+                      <p className="text-xs text-slate-400 mb-1">
+                        Evidence
                       </p>
 
+                      <p className="text-sm text-slate-600">
+                        {skill.evidence}
+                      </p>
                     </div>
 
-
-                    {skill.confidence !== null ? (
-
-                      <div className="mt-5">
-
-                        <div className="mb-2 flex items-center justify-between">
-
-                          <span className="text-[10px] font-medium uppercase tracking-wide text-slate-400">
-                            AI confidence
-                          </span>
-
-                          <span className="text-xs font-semibold text-slate-700">
-                            {skill.confidence}%
-                          </span>
-
-                        </div>
-
-                        <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
-
-                          <div
-                            className="h-full rounded-full bg-[#0a6ed1]"
-                            style={{
-                              width: `${skill.confidence}%`,
-                            }}
-                          />
-
-                        </div>
-
-                      </div>
-
-                    ) : (
-
-                      <div className="mt-5 rounded-lg bg-emerald-50 px-3 py-2 text-[10px] font-medium text-emerald-700">
-                        ✓ Added by you
-                      </div>
-
-                    )}
-
                   </div>
-
                 ))}
 
+              </div>
 
-                {/* Add skill card */}
+              {/* Add Skill */}
+              <div className="mt-6 pt-6 border-t border-slate-200">
 
-                <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-5">
+                <h3 className="font-semibold text-slate-800 mb-3">
+                  Add another skill
+                </h3>
 
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
-                    +
-                  </div>
+                <div className="flex flex-col sm:flex-row gap-3">
 
-                  <h3 className="mt-4 font-semibold text-slate-800">
-                    Add another skill
-                  </h3>
+                  <input
+                    type="text"
+                    value={newSkill}
+                    onChange={(e) => setNewSkill(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault()
+                        handleAddSkill()
+                      }
+                    }}
+                    placeholder="Enter a skill name"
+                    className="flex-1 border border-slate-300 rounded-lg px-4 py-2.5 outline-none focus:ring-2 focus:ring-blue-500"
+                  />
 
-                  <p className="mt-1 text-xs leading-5 text-slate-500">
-                    Add a capability that isn't currently shown.
+                  <button
+                    onClick={handleAddSkill}
+                    className="px-5 py-2.5 bg-slate-900 text-white rounded-lg hover:bg-slate-700"
+                  >
+                    + Add Skill
+                  </button>
+
+                </div>
+              </div>
+
+            </div>
+
+            {/* Human Confirmation */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 mt-6">
+
+              <div className="flex items-start gap-3">
+
+                <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center text-green-700 text-lg">
+                  ✓
+                </div>
+
+                <div className="flex-1">
+
+                  <h2 className="font-bold text-slate-900">
+                    Employee Confirmation
+                  </h2>
+
+                  <p className="text-sm text-slate-500 mt-1">
+                    Confirm that the displayed skills accurately represent
+                    your professional abilities.
                   </p>
 
-
-                  <div className="mt-4 flex gap-2">
-
-                    <input
-                      value={newSkill}
-                      onChange={(e) => setNewSkill(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") addSkill()
-                      }}
-                      placeholder="e.g. Docker"
-                      className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-50"
-                    />
-
-                    <button
-                      onClick={addSkill}
-                      className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-700"
-                    >
-                      Add
-                    </button>
-
-                  </div>
+                  {confirmed && (
+                    <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-3">
+                      <p className="text-sm text-green-700 font-medium">
+                        ✓ Skills confirmed successfully.
+                      </p>
+                    </div>
+                  )}
 
                 </div>
 
               </div>
 
-            </section>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mt-6 pt-5 border-t border-slate-100">
 
+                <button
+                  onClick={handleConfirmSkills}
+                  disabled={confirmed}
+                  className={`px-5 py-2.5 rounded-lg font-medium ${
+                    confirmed
+                      ? "bg-green-100 text-green-700 cursor-not-allowed"
+                      : "bg-green-600 text-white hover:bg-green-700"
+                  }`}
+                >
+                  {confirmed ? "Skills Confirmed" : "Confirm My Skills"}
+                </button>
 
-            {/* Human confirmation */}
-
-            <section className="mt-8 overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-sm">
-
-              <div className="h-1 bg-[#0a6ed1]" />
-
-              <div className="p-6 lg:p-7">
-
-                <div className="flex flex-col gap-5 sm:flex-row">
-
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-[#0a6ed1]">
-                    ✓
-                  </div>
-
-                  <div className="flex-1">
-
-                    <div className="flex flex-wrap items-center gap-2">
-
-                      <h2 className="text-base font-semibold text-slate-900">
-                        Your confirmation
-                      </h2>
-
-                      <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-700">
-                        HUMAN CHECK
-                      </span>
-
-                    </div>
-
-                    <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
-                      AI has suggested these skills based on your
-                      profile. Please review them before continuing.
-                      You can remove skills that aren't accurate or
-                      add skills that are missing.
-                    </p>
-
-
-                    <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
-
-                      {!confirmed ? (
-
-                        <button
-                          onClick={confirmSkills}
-                          className="rounded-lg bg-[#0a6ed1] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#085caf] active:scale-[0.99]"
-                        >
-                          Confirm my skills
-                        </button>
-
-                      ) : (
-
-                        <div className="flex items-center gap-2 rounded-lg bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700">
-                          <span>✓</span>
-                          Skills confirmed
-                        </div>
-
-                      )}
-
-                      <span className="text-[11px] text-slate-400">
-                        {skills.length} skills in your profile
-                      </span>
-
-                    </div>
-
-                  </div>
-
-                </div>
+                <button
+                  onClick={() => navigate("/matching")}
+                  disabled={!confirmed}
+                  className={`px-5 py-2.5 rounded-lg font-medium ${
+                    confirmed
+                      ? "bg-blue-600 text-white hover:bg-blue-700"
+                      : "bg-slate-200 text-slate-400 cursor-not-allowed"
+                  }`}
+                >
+                  Continue to Role Matching →
+                </button>
 
               </div>
-
-            </section>
-
-
-            {/* Next step */}
-
-            <div className="mt-5 flex justify-end">
-
-              <button
-                disabled={!confirmed}
-                className={`rounded-lg px-5 py-2.5 text-sm font-semibold transition ${
-                  confirmed
-                    ? "bg-slate-900 text-white hover:bg-slate-700"
-                    : "cursor-not-allowed bg-slate-100 text-slate-400"
-                }`}
-              >
-                Continue to Role Matching →
-              </button>
 
             </div>
 
           </div>
-
         </main>
-
       </div>
-
     </div>
   )
 }
