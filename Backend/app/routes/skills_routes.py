@@ -9,7 +9,7 @@ from app.models.skills_model import (
 from app.controllers import skills_controller
 from app.controllers import skills_controller
 
-router = APIRouter(prefix="/api/v1/skills", tags=["Skills Discovery & Confirmation"])
+router = APIRouter(prefix="/api/skills", tags=["Skills Discovery & Confirmation"])
 
 @router.post("/extract", response_model=ProfileExtractResponse)
 async def extract_skills(payload: ProfileExtractRequest):
