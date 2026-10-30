@@ -11,8 +11,11 @@ from utils.database import (
     close_pool
 )
 
-from app.routes.skills_routes import router as skills_router
+# Auth Router
+from app.routes.auth_routes import router as auth_router
 
+# Pages Router
+from app.routes.skills_routes import router as skills_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -42,7 +45,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
+app.include_router(auth_router)
 app.include_router(skills_router)
 
 

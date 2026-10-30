@@ -360,6 +360,7 @@ def get_employee_skills(employee_id):
 # GET AUDIT LOGS
 # ==================================================
 
+
 def get_audit_logs(employee_id=None):
     conn = None
     cursor = None
@@ -373,7 +374,7 @@ def get_audit_logs(employee_id=None):
                 """
                 SELECT
                     LOG_ID,
-                    TIMESTAMP,
+                    LOG_TIMESTAMP,
                     EMPLOYEE_ID,
                     ACTOR,
                     ACTION,
@@ -381,7 +382,7 @@ def get_audit_logs(employee_id=None):
                     DETAILS
                 FROM AUDIT_LOGS
                 WHERE EMPLOYEE_ID = ?
-                ORDER BY TIMESTAMP DESC
+                ORDER BY LOG_TIMESTAMP DESC
                 """,
                 (employee_id,)
             )
@@ -390,14 +391,14 @@ def get_audit_logs(employee_id=None):
                 """
                 SELECT
                     LOG_ID,
-                    TIMESTAMP,
+                    LOG_TIMESTAMP,
                     EMPLOYEE_ID,
                     ACTOR,
                     ACTION,
                     TOOL,
                     DETAILS
                 FROM AUDIT_LOGS
-                ORDER BY TIMESTAMP DESC
+                ORDER BY LOG_TIMESTAMP DESC
                 """
             )
 
@@ -405,3 +406,4 @@ def get_audit_logs(employee_id=None):
 
     finally:
         _close_resources(cursor, conn)
+
