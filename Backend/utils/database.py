@@ -1,6 +1,5 @@
 
 import os
-import time
 import queue
 import threading
 
@@ -20,7 +19,6 @@ _pool_closed = False
 
 
 def _create_connection():
-    start = time.perf_counter()
 
     conn = dbapi.connect(
         address=os.getenv("HANA_HOST"),
@@ -30,11 +28,6 @@ def _create_connection():
         encrypt=True,
         sslValidateCertificate=True,
         IPAddressFamily="IPv4First"
-    )
-
-    print(
-        f"[DATABASE] New connection created in "
-        f"{time.perf_counter() - start:.3f}s"
     )
 
     return conn

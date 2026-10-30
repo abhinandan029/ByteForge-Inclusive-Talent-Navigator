@@ -37,7 +37,7 @@ def _close_resources(cursor=None, conn=None):
 
     if conn:
         release_connection(conn)
-        
+
 
 def _to_bool(value):
     """
@@ -268,26 +268,16 @@ def save_confirmed_skills(employee_id, confirmed_skills):
 # GET EMPLOYEE + SKILLS STATE
 # ==================================================
 
-
-import time
-
 def get_employee_skills(employee_id):
     conn = None
     cursor = None
 
-    total_start = time.perf_counter()
-
     try:
         # 1. Database connection
-        start = time.perf_counter()
         conn = get_connection()
-        print(f"[TIMING] Connection: {time.perf_counter() - start:.3f}s")
-
         cursor = conn.cursor()
 
         # 2. Employee profile
-        start = time.perf_counter()
-
         cursor.execute(
             """
             SELECT
@@ -307,11 +297,6 @@ def get_employee_skills(employee_id):
 
         employee = _fetch_one(cursor)
 
-        print(
-            f"[TIMING] Employee query + fetch: "
-            f"{time.perf_counter() - start:.3f}s"
-        )
-
         if not employee:
             raise ValueError("Employee not found")
 
@@ -326,8 +311,6 @@ def get_employee_skills(employee_id):
         )
 
         # 3. Extracted draft skills
-        start = time.perf_counter()
-
         cursor.execute(
             """
             SELECT
@@ -344,14 +327,8 @@ def get_employee_skills(employee_id):
 
         draft_skills = _fetch_all(cursor)
 
-        print(
-            f"[TIMING] Draft skills query + fetch: "
-            f"{time.perf_counter() - start:.3f}s"
-        )
 
         # 4. Confirmed skills
-        start = time.perf_counter()
-
         cursor.execute(
             """
             SELECT
@@ -366,16 +343,6 @@ def get_employee_skills(employee_id):
         )
 
         confirmed_skills = _fetch_all(cursor)
-
-        print(
-            f"[TIMING] Confirmed skills query + fetch: "
-            f"{time.perf_counter() - start:.3f}s"
-        )
-
-        print(
-            f"[TIMING] Total model execution: "
-            f"{time.perf_counter() - total_start:.3f}s"
-        )
 
         return {
             "employee": employee,
