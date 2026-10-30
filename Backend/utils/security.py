@@ -1,5 +1,5 @@
-
 import os
+import re
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
@@ -16,12 +16,33 @@ if not JWT_SECRET:
     raise RuntimeError("JWT_SECRET is missing from environment variables")
 
 
+def validate_password(password: str):
+    if len(password) < 8:
+        raise ValueError("Password must contain at least 8 characters.")
+
+    if not re.search(r"[A-Z]", password):
+        raise ValueError("Password must contain at least one uppercase letter.")
+
+    if not re.search(r"[a-z]", password):
+        raise ValueError("Password must contain at least one lowercase letter.")
+
+    if not re.search(r"[0-9]", password):
+        raise ValueError("Password must contain at least one number.")
+
+    if not re.search(r"[^A-Za-z0-9\s]", password):
+        raise ValueError("Password must contain at least one special character.")
+
+    if re.search(r"\s", password):
+        raise ValueError("Password must not contain spaces.")
+
+    if len(password.encode("utf-8")) > 72:
+        raise ValueError("Password must not exceed 72 UTF-8 bytes.")
+
+
 def hash_password(password: str) -> str:
+    validate_password(password)
+
     password_bytes = password.encode("utf-8")
-
-    if len(password_bytes) > 72:
-        raise ValueError("Password must not exceed 72 UTF-8 bytes")
-
     salt = bcrypt.gensalt(rounds=12)
     hashed = bcrypt.hashpw(password_bytes, salt)
 

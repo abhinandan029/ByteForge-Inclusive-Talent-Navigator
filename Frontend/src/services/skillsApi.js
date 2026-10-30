@@ -92,17 +92,19 @@ export async function confirmSkills(payload) {
 }
 
 // AUDIT LOGS
-export async function getSkillsAuditLogs(employeeId = null) {
-  const url = employeeId
-    ? `${API_BASE_URL}/audit/logs?employee_id=${encodeURIComponent(employeeId)}`
-    : `${API_BASE_URL}/audit/logs`;
-
-  return request(url);
+export async function getSkillsAuditLogs() {
+  return request(`${API_BASE_URL}/audit/logs`);
 }
 
-// Clear cached data after a mutation.
+// CLEAR CACHED DATA AFTER A MUTATION
 export function invalidateEmployeeSkills(employeeId) {
   if (employeeId) {
     employeeSkillsCache.delete(employeeId);
   }
+}
+
+// CLEAR ALL CACHED DATA (useful when changing accounts)
+export function clearEmployeeSkillsCache() {
+  employeeSkillsCache.clear();
+  employeeSkillsRequests.clear();
 }

@@ -16,21 +16,7 @@ import {
 } from "lucide-react";
 
 import { getEmployeeSkills } from "../services/skillsApi";
-// Adjust this import path to match your project structure.
-
-
-function getLoggedInUser() {
-  try {
-    const storedUser = sessionStorage.getItem("itn_user");
-
-    if (!storedUser) return null;
-
-    return JSON.parse(storedUser);
-  } catch {
-    return null;
-  }
-}
-
+import { useAuth } from "../contexts/AuthContext";
 
 function InfoCard({ icon: Icon, title, value, subtitle }) {
   return (
@@ -51,7 +37,6 @@ function InfoCard({ icon: Icon, title, value, subtitle }) {
     </div>
   );
 }
-
 
 function SkillList({ title, skills, type }) {
   const isConfirmed = type === "confirmed";
@@ -94,6 +79,7 @@ function SkillList({ title, skills, type }) {
               title={skill.evidence_snippet || ""}
             >
               {skill.name}
+
               {skill.taxonomy_category && (
                 <span className="ml-2 text-xs opacity-60">
                   {skill.taxonomy_category}
@@ -107,13 +93,14 @@ function SkillList({ title, skills, type }) {
   );
 }
 
-
 export default function Dashboard() {
-  const [employeeId] = useState(() => {
-    const user = getLoggedInUser();
+  const {
+    employee: loggedInEmployee,
+    loading: authLoading,
+  } = useAuth();
 
-    return user?.employeeId || user?.employee_id || "";
-  });
+  // Employee ID comes from the authenticated session.
+  const employeeId = loggedInEmployee?.employee_id;
 
   const [employeeData, setEmployeeData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -123,8 +110,10 @@ export default function Dashboard() {
     let active = true;
 
     async function loadDashboard() {
-      if (!employeeId) {
-        setError("Your employee ID could not be found. Please log in again.");
+      if (authLoading) return;
+
+      if (!loggedInEmployee || !employeeId) {
+        setError("Your employee session could not be found. Please log in again.");
         setLoading(false);
         return;
       }
@@ -154,14 +143,17 @@ export default function Dashboard() {
     return () => {
       active = false;
     };
-  }, [employeeId]);
+  }, [employeeId, loggedInEmployee, authLoading]);
 
-
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="text-center">
-          <RefreshCw className="mx-auto animate-spin text-indigo-600" size={30} />
+          <RefreshCw
+            className="mx-auto animate-spin text-indigo-600"
+            size={30}
+          />
+
           <p className="mt-3 text-sm text-slate-500">
             Loading your dashboard...
           </p>
@@ -169,7 +161,6 @@ export default function Dashboard() {
       </div>
     );
   }
-
 
   if (error) {
     return (
@@ -192,8 +183,8 @@ export default function Dashboard() {
     );
   }
 
-
   const employee = employeeData?.employee;
+
   const draftSkills = employeeData?.extracted_skills_draft || [];
   const confirmedSkills = employeeData?.confirmed_skills_final || [];
 
@@ -202,7 +193,6 @@ export default function Dashboard() {
   );
 
   const readyForMatching = Boolean(employee?.ready_for_matching);
-
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 lg:px-10">
@@ -216,7 +206,7 @@ export default function Dashboard() {
             </p>
 
             <h1 className="mt-2 text-3xl font-bold text-slate-900">
-              Welcome, {employee?.full_name || "Employee"}
+              Welcome, {employee?.full_name || loggedInEmployee?.full_name || "Employee"}
             </h1>
 
             <p className="mt-2 text-slate-500">
@@ -233,7 +223,6 @@ export default function Dashboard() {
           </Link>
         </div>
 
-
         {/* EMPLOYEE PROFILE */}
         <section className="mb-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
@@ -243,7 +232,7 @@ export default function Dashboard() {
 
             <div className="flex-1">
               <h2 className="text-xl font-bold text-slate-900">
-                {employee?.full_name || "Employee"}
+                {employee?.full_name || loggedInEmployee?.full_name || "Employee"}
               </h2>
 
               <p className="mt-1 text-slate-500">
@@ -268,11 +257,12 @@ export default function Dashboard() {
                 <Clock3 size={17} />
               )}
 
-              {readyForMatching ? "Ready for matching" : "Not ready for matching"}
+              {readyForMatching
+                ? "Ready for matching"
+                : "Not ready for matching"}
             </div>
           </div>
         </section>
-
 
         {/* PROFILE INFORMATION */}
         <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -305,7 +295,6 @@ export default function Dashboard() {
           />
         </div>
 
-
         {/* SKILLS OVERVIEW */}
         <div className="mb-5">
           <h2 className="text-xl font-bold text-slate-900">
@@ -330,7 +319,6 @@ export default function Dashboard() {
             type="confirmed"
           />
         </div>
-
 
         {/* STATUS */}
         <section className="grid grid-cols-1 gap-5 md:grid-cols-2">
@@ -361,7 +349,6 @@ export default function Dashboard() {
               <ArrowRight size={16} />
             </Link>
           </div>
-
 
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex items-center gap-3">

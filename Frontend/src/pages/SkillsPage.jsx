@@ -18,27 +18,16 @@ import {
   extractSkills,
   confirmSkills,
 } from "../services/skillsApi";
-// Adjust this import path to match your project structure.
 
-
-function getLoggedInUser() {
-  try {
-    const storedUser = sessionStorage.getItem("itn_user");
-
-    return storedUser ? JSON.parse(storedUser) : null;
-  } catch {
-    return null;
-  }
-}
-
+import { useAuth } from "../contexts/AuthContext";
 
 export default function SkillsPage() {
-  const [user] = useState(getLoggedInUser);
+  // Get the authenticated employee from AuthContext
+  const { employee: user } = useAuth();
 
-  const employeeId = user?.employeeId || user?.employee_id || "";
+  const employeeId = user?.employee_id || "";
 
   const profileText =
-    user?.profileText ||
     user?.profile_text ||
     user?.profile?.profile_text ||
     "";
@@ -56,7 +45,6 @@ export default function SkillsPage() {
 
   const [newSkill, setNewSkill] = useState("");
   const [newCategory, setNewCategory] = useState("General");
-
 
   // ==========================================
   // LOAD EXISTING SKILLS
@@ -101,7 +89,6 @@ export default function SkillsPage() {
     };
   }, [employeeId]);
 
-
   // ==========================================
   // EXTRACT SKILLS
   // ==========================================
@@ -128,6 +115,7 @@ export default function SkillsPage() {
 
       setDraftSkills(extracted);
       setConfirmedSkills([]);
+
       setEmployee((previous) =>
         previous
           ? {
@@ -145,7 +133,6 @@ export default function SkillsPage() {
       setExtracting(false);
     }
   }
-
 
   // ==========================================
   // ADD A SKILL
@@ -180,7 +167,6 @@ export default function SkillsPage() {
     setSuccess("Skill added. Confirm your changes to save them.");
   }
 
-
   // ==========================================
   // REMOVE A SKILL
   // ==========================================
@@ -192,7 +178,6 @@ export default function SkillsPage() {
 
     setSuccess("Skill removed from the review list.");
   }
-
 
   // ==========================================
   // CONFIRM SKILLS
@@ -240,7 +225,6 @@ export default function SkillsPage() {
     }
   }
 
-
   // ==========================================
   // LOADING STATE
   // ==========================================
@@ -261,7 +245,6 @@ export default function SkillsPage() {
       </div>
     );
   }
-
 
   // ==========================================
   // ERROR STATE
@@ -288,9 +271,7 @@ export default function SkillsPage() {
     );
   }
 
-
   const isConfirmed = Boolean(employee?.is_confirmed);
-
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 lg:px-10">
@@ -340,7 +321,6 @@ export default function SkillsPage() {
           </div>
         </div>
 
-
         {/* EMPLOYEE DETAILS */}
         <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <p className="text-sm text-slate-500">Employee</p>
@@ -356,7 +336,6 @@ export default function SkillsPage() {
           </p>
         </section>
 
-
         {/* NOTIFICATIONS */}
         {error && (
           <div className="mb-5 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
@@ -371,7 +350,6 @@ export default function SkillsPage() {
             {success}
           </div>
         )}
-
 
         {/* EXTRACTION */}
         <section className="mb-6 rounded-2xl border border-indigo-100 bg-indigo-50/60 p-5">
@@ -413,7 +391,6 @@ export default function SkillsPage() {
           </div>
         </section>
 
-
         {/* SKILL LIST */}
         <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
           <div className="mb-5 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
@@ -431,7 +408,6 @@ export default function SkillsPage() {
               {draftSkills.length} skills
             </span>
           </div>
-
 
           {draftSkills.length === 0 ? (
             <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-5 py-10 text-center">
@@ -482,7 +458,6 @@ export default function SkillsPage() {
             </div>
           )}
 
-
           {/* ADD SKILL */}
           <div className="mt-6 border-t border-slate-100 pt-5">
             <h3 className="mb-3 font-semibold text-slate-800">
@@ -526,7 +501,6 @@ export default function SkillsPage() {
             </div>
           </div>
 
-
           {/* CONFIRM */}
           <div className="mt-6 flex flex-col justify-between gap-4 border-t border-slate-100 pt-5 sm:flex-row sm:items-center">
             <div>
@@ -558,7 +532,6 @@ export default function SkillsPage() {
             </button>
           </div>
         </section>
-
 
         {/* CONFIRMED SKILLS */}
         <section className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
@@ -598,7 +571,6 @@ export default function SkillsPage() {
             </div>
           )}
         </section>
-
       </div>
     </main>
   );
