@@ -12,8 +12,12 @@ from app.database.connection import (
 )
 
 from app.routes.auth_routes import router as auth_router
+
 from app.routes.hr_routes import router as hr_router
+from app.routes.hr_job_routes import router as hr_job_router
+
 from app.routes.skills_routes import router as skills_router
+
 
 
 # ==================================================
@@ -69,7 +73,10 @@ app.add_middleware(
 # ==================================================
 
 app.include_router(auth_router)
+
 app.include_router(hr_router)
+app.include_router(hr_job_router)
+
 app.include_router(skills_router)
 
 
