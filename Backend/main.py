@@ -16,6 +16,7 @@ from app.routes.hr_routes import router as hr_router
 from app.routes.hr_job_routes import router as hr_job_router
 from app.routes.skills_routes import router as skills_router
 from app.routes.matching_routes import router as matching_router
+from app.routes.bias_audit_routes import router as bias_audit_router
 
 
 # ==================================================
@@ -78,6 +79,8 @@ app.include_router(hr_job_router)
 app.include_router(skills_router)
 
 app.include_router(matching_router)
+
+app.include_router(bias_audit_router)
 
 
 # ==================================================

@@ -11,6 +11,10 @@ from app.models.matching_model import (
     get_matching_result_by_id
 )
 
+from app.controllers.bias_audit_controller import (
+    generate_bias_flags_for_matching_results
+)
+
 
 # ==========================================
 # HELPER FUNCTIONS
@@ -146,7 +150,6 @@ def calculate_skill_match(
             1.0
         )
 
-        # Invalid or negative weights are not allowed.
         if weight < 0:
             raise ValueError(
                 f"Invalid weight for skill '{skill_name}'. "
@@ -287,7 +290,16 @@ def run_internal_matching(
 
     Only confirmed employee skills are used.
 
-    Results are saved in MATCHING_RESULTS.
+    Workflow:
+    1. Fetch eligible employees and active roles.
+    2. Calculate employee-role matching scores.
+    3. Save or update matching results.
+    4. Automatically generate bias-audit flags.
+    5. Return matching and audit statistics.
+
+    Bias flags are advisory signals only.
+    They do not automatically reject employees
+    or modify matching scores.
     """
 
     # --------------------------------------
@@ -307,6 +319,11 @@ def run_internal_matching(
             "total_employees_processed": 0,
             "total_job_roles_processed": 0,
             "total_matches_generated": 0,
+            "bias_audit": {
+                "total_matches_evaluated": 0,
+                "total_flags_detected": 0,
+                "total_new_flags_created": 0
+            },
             "results": []
         }
 
@@ -327,6 +344,11 @@ def run_internal_matching(
             "total_employees_processed": len(employees),
             "total_job_roles_processed": 0,
             "total_matches_generated": 0,
+            "bias_audit": {
+                "total_matches_evaluated": 0,
+                "total_flags_detected": 0,
+                "total_new_flags_created": 0
+            },
             "results": []
         }
 
@@ -429,10 +451,27 @@ def run_internal_matching(
     # 6. Save matching results
     # --------------------------------------
 
-    save_matching_results(results)
+    saved_count = save_matching_results(results)
+
+    # save_matching_results adds match_id to
+    # every result dictionary before returning.
 
     # --------------------------------------
-    # 7. Return results
+    # 7. Automatically generate bias flags
+    # --------------------------------------
+
+    bias_audit_summary = (
+        generate_bias_flags_for_matching_results(
+            results
+        )
+    )
+
+    # This evaluates all generated matching results.
+    # Existing flags are not duplicated by the model.
+    # Existing HR reviews remain unchanged.
+
+    # --------------------------------------
+    # 8. Sort results by matching score
     # --------------------------------------
 
     results.sort(
@@ -440,11 +479,26 @@ def run_internal_matching(
         reverse=True
     )
 
+    # --------------------------------------
+    # 9. Return matching and audit results
+    # --------------------------------------
+
     return {
-        "message": "Internal talent matching completed successfully",
+        "message": (
+            "Internal talent matching and automatic "
+            "bias audit completed successfully."
+        ),
+
         "total_employees_processed": len(employees),
+
         "total_job_roles_processed": len(job_roles),
+
         "total_matches_generated": len(results),
+
+        "total_matches_saved": saved_count,
+
+        "bias_audit": bias_audit_summary,
+
         "results": results
     }
 
