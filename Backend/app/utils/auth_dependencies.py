@@ -45,7 +45,8 @@ def get_current_employee(request: Request):
         "full_name": employee["full_name"],
         "must_change_password": bool(
             employee["must_change_password"]
-        )
+        ),
+        "profile_text": employee.get("profile_text") or ""
     }
 
 

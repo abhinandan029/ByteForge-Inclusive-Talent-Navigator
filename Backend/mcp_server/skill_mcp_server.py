@@ -1,6 +1,15 @@
 # skills_mcp_server.py
 import json
 from typing import List, Dict, Any
+
+import sys
+from pathlib import Path
+
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+
+if str(BACKEND_ROOT) not in sys.path:
+    sys.path.insert(0, str(BACKEND_ROOT))
+
 from mcp.server.fastmcp import FastMCP
 from utils.llm_provider import call_llm_extract, SKILLS_TAXONOMY
 
@@ -55,10 +64,10 @@ def normalize_skills(raw_skills_json: str) -> str:
             seen_ids.add(matched_code)
             normalized_list.append({
                 "skill_id": matched_code,
-                "skill_name": SKILLS_TAXONOMY[matched_code]["canonical_name"],
-                "category": SKILLS_TAXONOMY[matched_code]["category"],
+                "name": SKILLS_TAXONOMY[matched_code]["canonical_name"],
+                "taxonomy_category": SKILLS_TAXONOMY[matched_code]["category"],
+                "evidence_snippet": evidence,
                 "raw_extracted": item.get("raw_skill"),
-                "evidence": evidence,
                 "taxonomy_mapped": True
             })
         elif raw_name and raw_name not in seen_ids:
@@ -67,10 +76,10 @@ def normalize_skills(raw_skills_json: str) -> str:
             seen_ids.add(raw_name)
             normalized_list.append({
                 "skill_id": custom_id,
-                "skill_name": item.get("raw_skill").strip(),
-                "category": "Unmapped / Emerging Skill",
+                "name": item.get("raw_skill", "").strip(),
+                "taxonomy_category": "Unmapped / Emerging Skill",
+                "evidence_snippet": evidence,
                 "raw_extracted": item.get("raw_skill"),
-                "evidence": evidence,
                 "taxonomy_mapped": False
             })
 

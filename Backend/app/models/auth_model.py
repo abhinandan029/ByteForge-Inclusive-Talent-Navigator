@@ -16,7 +16,8 @@ def get_employee_auth_record(employee_id: str):
                 EMPLOYEE_ID,
                 FULL_NAME,
                 PASSWORD_HASH,
-                MUST_CHANGE_PASSWORD
+                MUST_CHANGE_PASSWORD,
+                PROFILE_TEXT
             FROM EMPLOYEES
             WHERE EMPLOYEE_ID = ?
             """,
@@ -28,7 +29,10 @@ def get_employee_auth_record(employee_id: str):
         if not row:
             return None
 
-        columns = [column[0].lower() for column in cursor.description]
+        columns = [
+            column[0].lower()
+            for column in cursor.description
+        ]
 
         return dict(zip(columns, row))
 
