@@ -1,30 +1,28 @@
 
-from utils.database import get_connection, release_connection
+from app.database.connection import (
+    get_connection,
+    release_connection,
+    get_database_type
+)
+
 
 # ==================================================
 # DATABASE HELPERS
 # ==================================================
 
 def _fetch_all(cursor):
-    """Convert cursor rows into dictionaries using column names."""
     columns = [column[0].lower() for column in cursor.description]
     rows = cursor.fetchall()
-
-    return [
-        dict(zip(columns, row))
-        for row in rows
-    ]
+    return [dict(zip(columns, row)) for row in rows]
 
 
 def _fetch_one(cursor):
-    """Fetch one row as a dictionary."""
     row = cursor.fetchone()
 
     if row is None:
         return None
 
     columns = [column[0].lower() for column in cursor.description]
-
     return dict(zip(columns, row))
 
 
@@ -40,14 +38,14 @@ def _close_resources(cursor=None, conn=None):
 
 
 def _to_bool(value):
-    """
-    Convert SAP HANA TINYINT / BOOLEAN values
-    into Python Boolean values.
-    """
     if isinstance(value, str):
         return value.strip().lower() in ("1", "true", "yes")
 
     return bool(value)
+
+
+def _normalize_skill_name(name):
+    return (name or "").strip().casefold()
 
 
 def _add_audit_log(
@@ -70,14 +68,38 @@ def _add_audit_log(
         )
         VALUES (?, ?, ?, ?, ?)
         """,
-        (
-            employee_id,
-            actor,
-            action,
-            tool,
-            details
-        )
+        (employee_id, actor, action, tool, details)
     )
+
+
+def _get_employee(cursor, employee_id):
+    cursor.execute(
+        """
+        SELECT EMPLOYEE_ID
+        FROM EMPLOYEES
+        WHERE EMPLOYEE_ID = ?
+        """,
+        (employee_id,)
+    )
+
+    return cursor.fetchone() is not None
+
+
+def _get_confirmed_skill_names(cursor, employee_id):
+    cursor.execute(
+        """
+        SELECT NAME
+        FROM CONFIRMED_SKILLS_FINAL
+        WHERE EMPLOYEE_ID = ?
+        """,
+        (employee_id,)
+    )
+
+    return {
+        _normalize_skill_name(row[0])
+        for row in cursor.fetchall()
+        if row[0]
+    }
 
 
 # ==================================================
@@ -92,20 +114,39 @@ def save_extracted_skills(employee_id, extracted_skills):
         conn = get_connection()
         cursor = conn.cursor()
 
-        # Verify employee exists
-        cursor.execute(
-            """
-            SELECT EMPLOYEE_ID
-            FROM EMPLOYEES
-            WHERE EMPLOYEE_ID = ?
-            """,
-            (employee_id,)
-        )
-
-        if not cursor.fetchone():
+        if not _get_employee(cursor, employee_id):
             raise ValueError("Employee not found")
 
-        # Remove previous draft skills
+        confirmed_names = _get_confirmed_skill_names(
+            cursor,
+            employee_id
+        )
+
+        pending_skills = []
+        seen_names = set(confirmed_names)
+
+        for skill in extracted_skills:
+            name = (skill.get("name") or "").strip()
+            normalized_name = _normalize_skill_name(name)
+
+            if not name or normalized_name in seen_names:
+                continue
+
+            seen_names.add(normalized_name)
+
+            pending_skills.append({
+                "skill_id": skill["skill_id"],
+                "name": name,
+                "taxonomy_category": (
+                    skill.get("taxonomy_category") or "General"
+                ),
+                "evidence_snippet": (
+                    skill.get("evidence_snippet") or ""
+                )
+            })
+
+        # Replace pending proposals only.
+        # Existing confirmed skills are never deleted.
         cursor.execute(
             """
             DELETE FROM EXTRACTED_SKILLS_DRAFT
@@ -114,8 +155,7 @@ def save_extracted_skills(employee_id, extracted_skills):
             (employee_id,)
         )
 
-        # Save latest extracted skills
-        for skill in extracted_skills:
+        for skill in pending_skills:
             cursor.execute(
                 """
                 INSERT INTO EXTRACTED_SKILLS_DRAFT
@@ -132,37 +172,32 @@ def save_extracted_skills(employee_id, extracted_skills):
                     employee_id,
                     skill["skill_id"],
                     skill["name"],
-                    skill.get("taxonomy_category", "General"),
-                    skill.get("evidence_snippet", "")
+                    skill["taxonomy_category"],
+                    skill["evidence_snippet"]
                 )
             )
 
-        # Reset confirmation and matching status.
-        # These columns are TINYINT in SAP HANA.
-        cursor.execute(
-            """
-            UPDATE EMPLOYEES
-            SET
-                IS_CONFIRMED = 0,
-                READY_FOR_MATCHING = 0,
-                UPDATED_AT = CURRENT_TIMESTAMP
-            WHERE EMPLOYEE_ID = ?
-            """,
-            (employee_id,)
-        )
-
+        # Do not reset confirmation or matching flags.
         _add_audit_log(
             cursor,
             employee_id,
             "AI_AGENT",
             "SKILLS_EXTRACTED",
             "SKILLS_DISCOVERY",
-            f"{len(extracted_skills)} skills extracted"
+            (
+                f"{len(extracted_skills)} skills discovered; "
+                f"{len(pending_skills)} new pending skills"
+            )
         )
 
         conn.commit()
 
-        return True
+        return {
+            "success": True,
+            "discovered_count": len(extracted_skills),
+            "pending_count": len(pending_skills),
+            "pending_skills": pending_skills
+        }
 
     except Exception:
         if conn:
@@ -185,61 +220,144 @@ def save_confirmed_skills(employee_id, confirmed_skills):
         conn = get_connection()
         cursor = conn.cursor()
 
-        # Verify employee exists
-        cursor.execute(
-            """
-            SELECT EMPLOYEE_ID
-            FROM EMPLOYEES
-            WHERE EMPLOYEE_ID = ?
-            """,
-            (employee_id,)
-        )
-
-        if not cursor.fetchone():
+        if not _get_employee(cursor, employee_id):
             raise ValueError("Employee not found")
 
-        # Replace previously confirmed skills
+        # Read currently pending skills.
         cursor.execute(
             """
-            DELETE FROM CONFIRMED_SKILLS_FINAL
+            SELECT
+                SKILL_ID,
+                NAME,
+                TAXONOMY_CATEGORY,
+                EVIDENCE_SNIPPET
+            FROM EXTRACTED_SKILLS_DRAFT
             WHERE EMPLOYEE_ID = ?
             """,
             (employee_id,)
         )
 
-        # Insert employee-confirmed skills
-        for skill in confirmed_skills:
-            cursor.execute(
-                """
-                INSERT INTO CONFIRMED_SKILLS_FINAL
-                (
-                    EMPLOYEE_ID,
-                    NAME,
-                    TAXONOMY_CATEGORY,
-                    EVIDENCE_SNIPPET
-                )
-                VALUES (?, ?, ?, ?)
-                """,
-                (
-                    employee_id,
-                    skill["name"],
-                    skill.get("taxonomy_category", "General"),
-                    skill.get("evidence_snippet", "")
-                )
-            )
+        draft_rows = _fetch_all(cursor)
 
-        # Mark employee as confirmed and ready for matching.
-        # These columns are TINYINT in SAP HANA.
+        draft_by_name = {
+            _normalize_skill_name(skill["name"]): skill
+            for skill in draft_rows
+            if skill.get("name")
+        }
+
+        # Existing confirmed skills must be preserved.
+        existing_confirmed_names = _get_confirmed_skill_names(
+            cursor,
+            employee_id
+        )
+
+        newly_confirmed = []
+        seen_names = set()
+
+        for submitted_skill in confirmed_skills:
+            name = (submitted_skill.get("name") or "").strip()
+            normalized_name = _normalize_skill_name(name)
+
+            if not name or normalized_name in seen_names:
+                continue
+
+            seen_names.add(normalized_name)
+
+            # If the skill is an extracted draft, use the database
+            # values rather than trusting client-supplied metadata.
+            draft_skill = draft_by_name.get(normalized_name)
+
+            if draft_skill:
+                skill_to_save = {
+                    "name": draft_skill["name"],
+                    "taxonomy_category": (
+                        draft_skill.get("taxonomy_category") or "General"
+                    ),
+                    "evidence_snippet": (
+                        draft_skill.get("evidence_snippet") or ""
+                    )
+                }
+            else:
+                # Skills manually added by the employee are not
+                # necessarily present in the draft table.
+                # Accept them as manual confirmations.
+                skill_to_save = {
+                    "name": name,
+                    "taxonomy_category": (
+                        submitted_skill.get("taxonomy_category") or "General"
+                    ),
+                    "evidence_snippet": (
+                        submitted_skill.get("evidence_snippet")
+                        or "Added by employee"
+                    )
+                }
+
+            # Never insert an already-confirmed skill again.
+            if normalized_name not in existing_confirmed_names:
+                cursor.execute(
+                    """
+                    INSERT INTO CONFIRMED_SKILLS_FINAL
+                    (
+                        EMPLOYEE_ID,
+                        NAME,
+                        TAXONOMY_CATEGORY,
+                        EVIDENCE_SNIPPET
+                    )
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (
+                        employee_id,
+                        skill_to_save["name"],
+                        skill_to_save["taxonomy_category"],
+                        skill_to_save["evidence_snippet"]
+                    )
+                )
+
+                existing_confirmed_names.add(normalized_name)
+                newly_confirmed.append(skill_to_save)
+
+            # Delete only the submitted skill's draft, if it exists.
+            # Other pending skills remain untouched.
+            if draft_skill:
+                cursor.execute(
+                    """
+                    DELETE FROM EXTRACTED_SKILLS_DRAFT
+                    WHERE EMPLOYEE_ID = ?
+                      AND SKILL_ID = ?
+                    """,
+                    (
+                        employee_id,
+                        draft_skill["skill_id"]
+                    )
+                )
+
+        # Derive flags from the actual confirmed table.
+        cursor.execute(
+            """
+            SELECT COUNT(*)
+            FROM CONFIRMED_SKILLS_FINAL
+            WHERE EMPLOYEE_ID = ?
+            """,
+            (employee_id,)
+        )
+
+        confirmed_count = cursor.fetchone()[0]
+        has_confirmed_skills = confirmed_count > 0
+
         cursor.execute(
             """
             UPDATE EMPLOYEES
             SET
-                IS_CONFIRMED = 1,
-                READY_FOR_MATCHING = 1,
+                IS_CONFIRMED = ?,
+                READY_FOR_MATCHING = ?,
                 UPDATED_AT = CURRENT_TIMESTAMP
             WHERE EMPLOYEE_ID = ?
             """,
-            (employee_id,)
+            (
+                1 if has_confirmed_skills else 0,
+                1 if has_confirmed_skills else 0,
+                employee_id
+            )
         )
 
         _add_audit_log(
@@ -248,12 +366,18 @@ def save_confirmed_skills(employee_id, confirmed_skills):
             "EMPLOYEE",
             "SKILLS_CONFIRMED",
             "SKILLS_DISCOVERY",
-            f"{len(confirmed_skills)} skills confirmed"
+            f"{len(newly_confirmed)} new skills confirmed"
         )
 
         conn.commit()
 
-        return True
+        return {
+            "success": True,
+            "confirmed_count": len(newly_confirmed),
+            "confirmed_skills": newly_confirmed,
+            "is_confirmed": has_confirmed_skills,
+            "ready_for_matching": has_confirmed_skills
+        }
 
     except Exception:
         if conn:
@@ -273,11 +397,9 @@ def get_employee_skills(employee_id):
     cursor = None
 
     try:
-        # 1. Database connection
         conn = get_connection()
         cursor = conn.cursor()
 
-        # 2. Employee profile
         cursor.execute(
             """
             SELECT
@@ -303,32 +425,16 @@ def get_employee_skills(employee_id):
         employee["has_career_break"] = _to_bool(
             employee["has_career_break"]
         )
+
         employee["is_confirmed"] = _to_bool(
             employee["is_confirmed"]
         )
+
         employee["ready_for_matching"] = _to_bool(
             employee["ready_for_matching"]
         )
 
-        # 3. Extracted draft skills
-        cursor.execute(
-            """
-            SELECT
-                SKILL_ID,
-                NAME,
-                TAXONOMY_CATEGORY,
-                EVIDENCE_SNIPPET
-            FROM EXTRACTED_SKILLS_DRAFT
-            WHERE EMPLOYEE_ID = ?
-            ORDER BY NAME
-            """,
-            (employee_id,)
-        )
-
-        draft_skills = _fetch_all(cursor)
-
-
-        # 4. Confirmed skills
+        # Fetch confirmed skills.
         cursor.execute(
             """
             SELECT
@@ -343,6 +449,46 @@ def get_employee_skills(employee_id):
         )
 
         confirmed_skills = _fetch_all(cursor)
+
+        confirmed_names = {
+            _normalize_skill_name(skill["name"])
+            for skill in confirmed_skills
+        }
+
+        # Fetch pending skills.
+        cursor.execute(
+            """
+            SELECT
+                SKILL_ID,
+                NAME,
+                TAXONOMY_CATEGORY,
+                EVIDENCE_SNIPPET
+            FROM EXTRACTED_SKILLS_DRAFT
+            WHERE EMPLOYEE_ID = ?
+            ORDER BY NAME
+            """,
+            (employee_id,)
+        )
+
+        all_drafts = _fetch_all(cursor)
+
+        # Never show a confirmed skill as pending.
+        draft_skills = [
+            skill
+            for skill in all_drafts
+            if _normalize_skill_name(skill.get("name"))
+            not in confirmed_names
+        ]
+
+        has_confirmed_skills = bool(confirmed_skills)
+
+        # Confirmed table is the source of truth.
+        employee["is_confirmed"] = has_confirmed_skills
+
+        employee["ready_for_matching"] = (
+            employee["ready_for_matching"]
+            and has_confirmed_skills
+        )
 
         return {
             "employee": employee,
@@ -359,7 +505,6 @@ def get_employee_skills(employee_id):
 # ==================================================
 # GET AUDIT LOGS
 # ==================================================
-
 
 def get_audit_logs(employee_id=None):
     conn = None
@@ -406,4 +551,3 @@ def get_audit_logs(employee_id=None):
 
     finally:
         _close_resources(cursor, conn)
-

@@ -22,40 +22,40 @@ import {
 import { useAuth } from "../contexts/AuthContext";
 
 export default function SkillsPage() {
-  // Authenticated employee
   const { employee: user } = useAuth();
 
   const employeeId = user?.employee_id || "";
-
   const profileText =
     user?.profile_text ||
     user?.profile?.profile_text ||
     "";
 
-  // Employee and skills state
   const [employee, setEmployee] = useState(null);
   const [draftSkills, setDraftSkills] = useState([]);
   const [confirmedSkills, setConfirmedSkills] = useState([]);
 
-  // Loading states
   const [loading, setLoading] = useState(true);
   const [extracting, setExtracting] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // Notifications
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  // Manual skill addition
   const [newSkill, setNewSkill] = useState("");
   const [newCategory, setNewCategory] = useState("General");
 
-  // Dynamic extraction summary
   const [extractionSummary, setExtractionSummary] = useState(null);
 
-  // ==========================================
-  // LOAD EXISTING SKILLS
-  // ==========================================
+  // Load the authoritative skills state from the backend.
+  async function refreshSkills() {
+    const data = await getEmployeeSkills(employeeId);
+
+    setEmployee(data.employee || null);
+    setDraftSkills(data.extracted_skills_draft || []);
+    setConfirmedSkills(data.confirmed_skills_final || []);
+
+    return data;
+  }
 
   useEffect(() => {
     let active = true;
@@ -96,10 +96,6 @@ export default function SkillsPage() {
     };
   }, [employeeId]);
 
-  // ==========================================
-  // BUILD EXTRACTION SUMMARY
-  // ==========================================
-
   function buildExtractionSummary(skills) {
     const matched = skills.filter(
       (skill) =>
@@ -115,9 +111,7 @@ export default function SkillsPage() {
 
     skills.forEach((skill) => {
       const category = skill.taxonomy_category || "General";
-
-      categories[category] =
-        (categories[category] || 0) + 1;
+      categories[category] = (categories[category] || 0) + 1;
     });
 
     return {
@@ -128,11 +122,13 @@ export default function SkillsPage() {
     };
   }
 
-  // ==========================================
-  // EXTRACT SKILLS
-  // ==========================================
-
+  // Extract only new, unconfirmed skills.
   async function handleExtractSkills() {
+    if (!employeeId) {
+      setError("Employee ID is missing. Please log in again.");
+      return;
+    }
+
     if (!profileText.trim()) {
       setError(
         "Your profile text is not available in your login data. Please make sure your employee profile contains profile_text."
@@ -152,26 +148,20 @@ export default function SkillsPage() {
 
       const extracted = data.extracted_skills || [];
 
-      // Update skills
-      setDraftSkills(extracted);
-      setConfirmedSkills([]);
+      // Display the newly extracted pending skills.
+      setExtractionSummary(buildExtractionSummary(extracted));
 
-      // Build dynamic summary
-      setExtractionSummary(
-        buildExtractionSummary(extracted)
+      // Reload both pending and confirmed skills from HANA.
+      const latestState = await refreshSkills();
+
+      const pendingCount =
+        latestState.extracted_skills_draft?.length || 0;
+
+      setSuccess(
+        pendingCount > 0
+          ? `${pendingCount} skills are ready for your review. Previously confirmed skills have been preserved.`
+          : "Extraction completed. No new skills are awaiting confirmation."
       );
-
-      // Reset confirmation state
-      setEmployee((previous) =>
-        previous
-          ? {
-              ...previous,
-              is_confirmed: false,
-              ready_for_matching: false,
-            }
-          : previous
-      );
-
     } catch (err) {
       setError(err.message || "Skill extraction failed.");
     } finally {
@@ -179,22 +169,24 @@ export default function SkillsPage() {
     }
   }
 
-  // ==========================================
-  // ADD A SKILL
-  // ==========================================
-
+  // Add a manual skill to the review list.
   function handleAddSkill() {
     const name = newSkill.trim();
 
     if (!name) return;
 
-    const alreadyExists = draftSkills.some(
+    const normalizedName = name.toLowerCase();
+
+    const alreadyExists = [
+      ...draftSkills,
+      ...confirmedSkills,
+    ].some(
       (skill) =>
-        skill.name.toLowerCase() === name.toLowerCase()
+        skill.name?.trim().toLowerCase() === normalizedName
     );
 
     if (alreadyExists) {
-      setError("This skill already exists.");
+      setError("This skill already exists in your pending or confirmed skills.");
       return;
     }
 
@@ -210,9 +202,7 @@ export default function SkillsPage() {
     setDraftSkills(updatedSkills);
 
     if (extractionSummary) {
-      setExtractionSummary(
-        buildExtractionSummary(updatedSkills)
-      );
+      setExtractionSummary(buildExtractionSummary(updatedSkills));
     }
 
     setNewSkill("");
@@ -221,10 +211,7 @@ export default function SkillsPage() {
     setSuccess("Skill added. Confirm your changes to save them.");
   }
 
-  // ==========================================
-  // REMOVE A SKILL
-  // ==========================================
-
+  // Remove a skill from the pending review list.
   function handleRemoveSkill(skillId) {
     const updatedSkills = draftSkills.filter(
       (skill) => skill.skill_id !== skillId
@@ -233,23 +220,16 @@ export default function SkillsPage() {
     setDraftSkills(updatedSkills);
 
     if (extractionSummary) {
-      setExtractionSummary(
-        buildExtractionSummary(updatedSkills)
-      );
+      setExtractionSummary(buildExtractionSummary(updatedSkills));
     }
 
     setSuccess("Skill removed from the review list.");
   }
 
-  // ==========================================
-  // CONFIRM SKILLS
-  // ==========================================
-
+  // Confirm pending and manually added skills.
   async function handleConfirmSkills() {
-    if (draftSkills.length === 0) {
-      setError(
-        "Add or extract at least one skill before confirming."
-      );
+    if (!draftSkills.length) {
+      setError("Add or extract at least one skill before confirming.");
       return;
     }
 
@@ -262,54 +242,27 @@ export default function SkillsPage() {
         employee_id: employeeId,
         confirmed_skills: draftSkills.map((skill) => ({
           name: skill.name,
-          taxonomy_category:
-            skill.taxonomy_category || "General",
-          evidence_snippet:
-            skill.evidence_snippet || "",
+          taxonomy_category: skill.taxonomy_category || "General",
+          evidence_snippet: skill.evidence_snippet || "",
         })),
       };
 
-      const data = await confirmSkills(payload);
+      await confirmSkills(payload);
 
-      const savedSkills =
-        data.confirmed_skills || payload.confirmed_skills;
+      // Always use the backend's saved state.
+      await refreshSkills();
 
-      // Move skills from draft to confirmed
-      setConfirmedSkills(savedSkills);
-      setDraftSkills([]);
-
-      // Hide the old extraction summary
       setExtractionSummary(null);
 
-      // Update employee confirmation status
-      setEmployee((previous) =>
-        previous
-          ? {
-              ...previous,
-              is_confirmed: true,
-              ready_for_matching: Boolean(
-                data.ready_for_matching
-              ),
-            }
-          : previous
-      );
-
       setSuccess(
-        "Your skills have been confirmed successfully."
+        "Your skills have been confirmed successfully. Previously confirmed skills have been preserved."
       );
-
     } catch (err) {
-      setError(
-        err.message || "Unable to confirm skills."
-      );
+      setError(err.message || "Unable to confirm skills.");
     } finally {
       setSaving(false);
     }
   }
-
-  // ==========================================
-  // LOADING STATE
-  // ==========================================
 
   if (loading) {
     return (
@@ -319,7 +272,6 @@ export default function SkillsPage() {
             size={30}
             className="mx-auto animate-spin text-indigo-600"
           />
-
           <p className="mt-3 text-sm text-slate-500">
             Loading your skills...
           </p>
@@ -327,10 +279,6 @@ export default function SkillsPage() {
       </div>
     );
   }
-
-  // ==========================================
-  // ERROR STATE
-  // ==========================================
 
   if (
     error &&
@@ -340,18 +288,13 @@ export default function SkillsPage() {
   ) {
     return (
       <div className="mx-auto mt-12 max-w-xl rounded-2xl border border-red-200 bg-red-50 p-6 text-center">
-        <AlertCircle
-          className="mx-auto text-red-600"
-          size={32}
-        />
+        <AlertCircle className="mx-auto text-red-600" size={32} />
 
         <h2 className="mt-3 font-semibold text-red-800">
           Unable to load skills
         </h2>
 
-        <p className="mt-2 text-sm text-red-700">
-          {error}
-        </p>
+        <p className="mt-2 text-sm text-red-700">{error}</p>
 
         <Link
           to="/dashboard"
@@ -368,9 +311,6 @@ export default function SkillsPage() {
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 lg:px-10">
       <div className="mx-auto max-w-5xl">
-
-        {/* HEADER */}
-
         <div className="mb-8">
           <Link
             to="/dashboard"
@@ -391,8 +331,8 @@ export default function SkillsPage() {
               </h1>
 
               <p className="mt-2 text-slate-500">
-                Review the skills identified from your employee
-                profile. You remain in control of what gets confirmed.
+                Review the skills identified from your employee profile.
+                You remain in control of what gets confirmed.
               </p>
             </div>
 
@@ -409,19 +349,13 @@ export default function SkillsPage() {
                 <AlertCircle size={17} />
               )}
 
-              {isConfirmed
-                ? "Skills confirmed"
-                : "Review pending"}
+              {isConfirmed ? "Skills confirmed" : "Review pending"}
             </div>
           </div>
         </div>
 
-        {/* EMPLOYEE DETAILS */}
-
         <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-sm text-slate-500">
-            Employee
-          </p>
+          <p className="text-sm text-slate-500">Employee</p>
 
           <h2 className="mt-1 text-lg font-bold text-slate-900">
             {employee?.full_name || "Employee"}
@@ -434,31 +368,19 @@ export default function SkillsPage() {
           </p>
         </section>
 
-        {/* ERROR NOTIFICATION */}
-
         {error && (
           <div className="mb-5 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-            <AlertCircle
-              size={18}
-              className="mt-0.5 shrink-0"
-            />
+            <AlertCircle size={18} className="mt-0.5 shrink-0" />
             {error}
           </div>
         )}
 
-        {/* SUCCESS NOTIFICATION */}
-
         {success && (
           <div className="mb-5 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
-            <CheckCircle2
-              size={18}
-              className="mt-0.5 shrink-0"
-            />
+            <CheckCircle2 size={18} className="mt-0.5 shrink-0" />
             {success}
           </div>
         )}
-
-        {/* AI SKILLS EXTRACTION */}
 
         <section className="mb-6 rounded-2xl border border-indigo-100 bg-indigo-50/60 p-5">
           <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
@@ -473,8 +395,8 @@ export default function SkillsPage() {
                 </h3>
 
                 <p className="mt-1 text-sm text-slate-600">
-                  Extract skills from your employee profile.
-                  You can review and edit the results before confirming.
+                  Extract skills from your employee profile. Review and edit
+                  the results before confirming.
                 </p>
               </div>
             </div>
@@ -486,10 +408,7 @@ export default function SkillsPage() {
             >
               {extracting ? (
                 <>
-                  <RefreshCw
-                    size={17}
-                    className="animate-spin"
-                  />
+                  <RefreshCw size={17} className="animate-spin" />
                   Extracting...
                 </>
               ) : (
@@ -502,11 +421,8 @@ export default function SkillsPage() {
           </div>
         </section>
 
-        {/* SKILLS EXTRACTION SUMMARY */}
-
         {extractionSummary && (
           <section className="mb-6 rounded-2xl border border-indigo-100 bg-white p-5 shadow-sm sm:p-6">
-
             <div className="mb-5 flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-lg font-bold text-slate-900">
@@ -514,7 +430,7 @@ export default function SkillsPage() {
                 </h2>
 
                 <p className="mt-1 text-sm text-slate-500">
-                  Overview of skills identified from your employee profile.
+                  Overview of newly identified skills.
                 </p>
               </div>
 
@@ -524,15 +440,11 @@ export default function SkillsPage() {
               </span>
             </div>
 
-            {/* STATISTICS */}
-
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-
               <div className="rounded-xl bg-indigo-50 p-4">
                 <p className="text-2xl font-bold text-indigo-700">
                   {extractionSummary.total}
                 </p>
-
                 <p className="mt-1 text-xs text-slate-600">
                   Skills extracted
                 </p>
@@ -542,7 +454,6 @@ export default function SkillsPage() {
                 <p className="text-2xl font-bold text-emerald-700">
                   {extractionSummary.matched}
                 </p>
-
                 <p className="mt-1 text-xs text-slate-600">
                   Taxonomy matched
                 </p>
@@ -552,7 +463,6 @@ export default function SkillsPage() {
                 <p className="text-2xl font-bold text-amber-700">
                   {extractionSummary.unmapped}
                 </p>
-
                 <p className="mt-1 text-xs text-slate-600">
                   Unmapped skills
                 </p>
@@ -560,19 +470,13 @@ export default function SkillsPage() {
 
               <div className="rounded-xl bg-purple-50 p-4">
                 <p className="text-2xl font-bold text-purple-700">
-                  {Object.keys(
-                    extractionSummary.categories
-                  ).length}
+                  {Object.keys(extractionSummary.categories).length}
                 </p>
-
                 <p className="mt-1 text-xs text-slate-600">
                   Skill categories
                 </p>
               </div>
-
             </div>
-
-            {/* CATEGORY DISTRIBUTION */}
 
             <div className="mt-6">
               <h3 className="mb-4 font-semibold text-slate-800">
@@ -580,42 +484,37 @@ export default function SkillsPage() {
               </h3>
 
               <div className="space-y-4">
-                {Object.entries(
-                  extractionSummary.categories
-                ).map(([category, count]) => {
-                  const percentage =
-                    extractionSummary.total > 0
-                      ? (count / extractionSummary.total) * 100
-                      : 0;
+                {Object.entries(extractionSummary.categories).map(
+                  ([category, count]) => {
+                    const percentage =
+                      extractionSummary.total > 0
+                        ? (count / extractionSummary.total) * 100
+                        : 0;
 
-                  return (
-                    <div key={category}>
-                      <div className="mb-1.5 flex justify-between gap-3 text-sm">
-                        <span className="font-medium text-slate-700">
-                          {category}
-                        </span>
+                    return (
+                      <div key={category}>
+                        <div className="mb-1.5 flex justify-between gap-3 text-sm">
+                          <span className="font-medium text-slate-700">
+                            {category}
+                          </span>
 
-                        <span className="text-slate-500">
-                          {count}{" "}
-                          {count === 1 ? "skill" : "skills"}
-                        </span>
+                          <span className="text-slate-500">
+                            {count} {count === 1 ? "skill" : "skills"}
+                          </span>
+                        </div>
+
+                        <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                          <div
+                            className="h-full rounded-full bg-indigo-500 transition-all duration-500"
+                            style={{ width: `${percentage}%` }}
+                          />
+                        </div>
                       </div>
-
-                      <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                        <div
-                          className="h-full rounded-full bg-indigo-500 transition-all duration-500"
-                          style={{
-                            width: `${percentage}%`,
-                          }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  }
+                )}
               </div>
             </div>
-
-            {/* EXTRACTION STATUS */}
 
             <div className="mt-6 flex items-start gap-3 rounded-xl border border-emerald-100 bg-emerald-50 p-4">
               <CheckCircle2
@@ -629,19 +528,15 @@ export default function SkillsPage() {
                 </p>
 
                 <p className="mt-1 text-xs text-emerald-700">
-                  Review the extracted skills below. They will only
-                  be used for matching after you confirm them.
+                  Review the extracted skills below. They will only be used
+                  for matching after you confirm them.
                 </p>
               </div>
             </div>
-
           </section>
         )}
 
-        {/* EXTRACTED SKILLS */}
-
         <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-
           <div className="mb-5 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
             <div>
               <h2 className="text-lg font-bold text-slate-900">
@@ -660,25 +555,22 @@ export default function SkillsPage() {
 
           {draftSkills.length === 0 ? (
             <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-5 py-10 text-center">
-              <Brain
-                className="mx-auto text-slate-400"
-                size={32}
-              />
+              <Brain className="mx-auto text-slate-400" size={32} />
 
               <h3 className="mt-3 font-semibold text-slate-700">
-                No extracted skills yet
+                No pending skills
               </h3>
 
               <p className="mt-1 text-sm text-slate-500">
-                Use the Extract Skills button to identify skills
-                from your profile.
+                Use the Extract Skills button to identify new skills from
+                your profile.
               </p>
             </div>
           ) : (
             <div className="space-y-3">
               {draftSkills.map((skill) => (
                 <div
-                  key={skill.skill_id}
+                  key={skill.skill_id || skill.name}
                   className="flex flex-col justify-between gap-3 rounded-xl border border-slate-200 p-4 sm:flex-row sm:items-center"
                 >
                   <div className="min-w-0">
@@ -698,9 +590,7 @@ export default function SkillsPage() {
                   </div>
 
                   <button
-                    onClick={() =>
-                      handleRemoveSkill(skill.skill_id)
-                    }
+                    onClick={() => handleRemoveSkill(skill.skill_id)}
                     disabled={saving}
                     aria-label={`Remove ${skill.name}`}
                     className="inline-flex items-center justify-center gap-2 self-start rounded-lg border border-red-200 px-3 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50 sm:self-center"
@@ -713,8 +603,6 @@ export default function SkillsPage() {
             </div>
           )}
 
-          {/* ADD SKILL */}
-
           <div className="mt-6 border-t border-slate-100 pt-5">
             <h3 className="mb-3 font-semibold text-slate-800">
               Add a skill manually
@@ -723,9 +611,7 @@ export default function SkillsPage() {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_auto]">
               <input
                 value={newSkill}
-                onChange={(event) =>
-                  setNewSkill(event.target.value)
-                }
+                onChange={(event) => setNewSkill(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
                     handleAddSkill();
@@ -737,9 +623,7 @@ export default function SkillsPage() {
 
               <select
                 value={newCategory}
-                onChange={(event) =>
-                  setNewCategory(event.target.value)
-                }
+                onChange={(event) => setNewCategory(event.target.value)}
                 className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-500"
               >
                 <option>General</option>
@@ -754,7 +638,7 @@ export default function SkillsPage() {
 
               <button
                 onClick={handleAddSkill}
-                disabled={!newSkill.trim() || saving}
+                disabled={!newSkill.trim() || saving || extracting}
                 className="inline-flex items-center justify-center gap-2 rounded-xl border border-indigo-200 px-5 py-3 text-sm font-semibold text-indigo-700 hover:bg-indigo-50 disabled:opacity-50"
               >
                 <Plus size={17} />
@@ -762,8 +646,6 @@ export default function SkillsPage() {
               </button>
             </div>
           </div>
-
-          {/* CONFIRM SKILLS */}
 
           <div className="mt-6 flex flex-col justify-between gap-4 border-t border-slate-100 pt-5 sm:flex-row sm:items-center">
             <div>
@@ -787,10 +669,7 @@ export default function SkillsPage() {
             >
               {saving ? (
                 <>
-                  <RefreshCw
-                    size={17}
-                    className="animate-spin"
-                  />
+                  <RefreshCw size={17} className="animate-spin" />
                   Saving...
                 </>
               ) : (
@@ -801,13 +680,9 @@ export default function SkillsPage() {
               )}
             </button>
           </div>
-
         </section>
 
-        {/* CONFIRMED SKILLS */}
-
         <section className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm sm:p-6">
-
           <div className="mb-4 flex items-center gap-3">
             <div className="rounded-xl bg-emerald-50 p-3 text-emerald-600">
               <CheckCircle2 size={21} />
@@ -844,9 +719,7 @@ export default function SkillsPage() {
               ))}
             </div>
           )}
-
         </section>
-
       </div>
     </main>
   );

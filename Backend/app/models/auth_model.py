@@ -1,5 +1,8 @@
 
-from utils.database import get_connection, release_connection
+from app.database.connection import (
+    get_connection,
+    release_connection
+)
 
 
 def get_employee_auth_record(employee_id: str):
@@ -66,6 +69,7 @@ def set_employee_password(
         )
 
         if not cursor.fetchone():
+            conn.rollback()
             return False
 
         cursor.execute(

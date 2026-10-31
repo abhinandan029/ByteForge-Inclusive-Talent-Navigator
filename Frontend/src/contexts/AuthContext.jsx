@@ -3,7 +3,7 @@ import {
   createContext,
   useContext,
   useEffect,
-  useState
+  useState,
 } from "react";
 
 const AuthContext = createContext(null);
@@ -27,7 +27,9 @@ async function authRequest(endpoint, options = {}) {
 
   if (!response.ok) {
     throw new Error(
-      data?.detail || data?.message || `Request failed (${response.status})`
+      data?.detail ||
+      data?.message ||
+      `Request failed (${response.status})`
     );
   }
 
@@ -66,7 +68,6 @@ export function AuthProvider({ children }) {
       }),
     });
 
-    // Fetch the authenticated employee from the backend.
     const currentEmployee = await authRequest("/me");
 
     setEmployee(currentEmployee);
@@ -86,7 +87,6 @@ export function AuthProvider({ children }) {
       }),
     });
 
-    // Refresh employee information after password change.
     const currentEmployee = await authRequest("/me");
 
     setEmployee(currentEmployee);

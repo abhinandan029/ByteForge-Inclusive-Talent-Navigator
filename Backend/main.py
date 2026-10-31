@@ -4,27 +4,43 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from utils.database import (
+from app.database.connection import (
     get_connection,
     release_connection,
-    initialize_pool,
-    close_pool
+    get_database_type,
+    initialize_database
 )
 
 # Auth Router
 from app.routes.auth_routes import router as auth_router
 
-# Pages Router
+# Skills Router
 from app.routes.skills_routes import router as skills_router
+
+
+# ==================================================
+# APPLICATION LIFESPAN
+# ==================================================
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    initialize_pool()
+
+    # Initialize the selected database connection
+    initialize_database()
+
+    print(
+        f"Application started using "
+        f"{get_database_type().upper()} database"
+    )
 
     yield
 
-    close_pool()
+    print("Application shutting down")
 
+
+# ==================================================
+# FASTAPI APPLICATION
+# ==================================================
 
 app = FastAPI(
     title="Inclusive Talent Navigator API",
@@ -33,6 +49,10 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+
+# ==================================================
+# CORS CONFIGURATION
+# ==================================================
 
 app.add_middleware(
     CORSMiddleware,
@@ -45,9 +65,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+# ==================================================
+# ROUTER REGISTRATION
+# ==================================================
+
 app.include_router(auth_router)
 app.include_router(skills_router)
 
+
+# ==================================================
+# HEALTH CHECK
+# ==================================================
 
 @app.get("/", tags=["Health Check"])
 def greet():
@@ -60,31 +89,75 @@ def greet():
 def health():
     return {
         "status": "healthy",
-        "service": "FastAPI"
+        "service": "FastAPI",
+        "database_type": get_database_type()
     }
 
 
+# ==================================================
+# DATABASE HEALTH CHECK
+# ==================================================
+
 @app.get("/api/health/database", tags=["Health Check"])
 def database_health():
+
     connection = None
     cursor = None
+
+    db_type = get_database_type()
 
     try:
         connection = get_connection()
         cursor = connection.cursor()
 
-        cursor.execute(
-            "SELECT CURRENT_USER, CURRENT_SCHEMA FROM DUMMY"
-        )
+        # Database-specific health query
+        if db_type == "mysql":
 
-        result = cursor.fetchone()
+            cursor.execute(
+                """
+                SELECT
+                    CURRENT_USER(),
+                    DATABASE()
+                """
+            )
 
-        return {
-            "status": "connected",
-            "database": "SAP HANA Cloud",
-            "user": result[0],
-            "schema": result[1]
-        }
+            result = cursor.fetchone()
+
+            return {
+                "status": "connected",
+                "database": "MySQL",
+                "user": result[0],
+                "schema": result[1]
+            }
+
+        elif db_type == "hana":
+
+            cursor.execute(
+                """
+                SELECT
+                    CURRENT_USER,
+                    CURRENT_SCHEMA
+                FROM DUMMY
+                """
+            )
+
+            result = cursor.fetchone()
+
+            return {
+                "status": "connected",
+                "database": "SAP HANA Cloud",
+                "user": result[0],
+                "schema": result[1]
+            }
+
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Unsupported database type: {db_type}"
+            )
+
+    except HTTPException:
+        raise
 
     except Exception as error:
         raise HTTPException(
