@@ -12,12 +12,10 @@ from app.database.connection import (
 )
 
 from app.routes.auth_routes import router as auth_router
-
 from app.routes.hr_routes import router as hr_router
 from app.routes.hr_job_routes import router as hr_job_router
-
 from app.routes.skills_routes import router as skills_router
-
+from app.routes.matching_routes import router as matching_router
 
 
 # ==================================================
@@ -78,6 +76,8 @@ app.include_router(hr_router)
 app.include_router(hr_job_router)
 
 app.include_router(skills_router)
+
+app.include_router(matching_router)
 
 
 # ==================================================
