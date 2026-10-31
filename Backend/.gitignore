@@ -16,3 +16,6 @@ __pycache__/
 # Testing and cache
 .pytest_cache/
 .mypy_cache/
+
+# Runtime audit logs
+audit_log.jsonl

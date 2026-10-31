@@ -76,6 +76,23 @@ def create_access_token(employee_id: str) -> str:
     )
 
 
+def create_hr_access_token(hr_id: str) -> str:
+    now = datetime.now(timezone.utc)
+
+    payload = {
+        "sub": hr_id,
+        "iat": now,
+        "exp": now + timedelta(minutes=JWT_EXPIRE_MINUTES),
+        "type": "hr_access"
+    }
+
+    return jwt.encode(
+        payload,
+        JWT_SECRET,
+        algorithm=JWT_ALGORITHM
+    )
+
+
 def decode_access_token(token: str) -> dict:
     return jwt.decode(
         token,
