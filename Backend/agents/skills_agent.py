@@ -38,10 +38,11 @@ class SkillsDiscoveryAgent:
     Enforces Responsible AI Requirement R1: skills remain in 'PENDING_CONFIRMATION'
     until the employee explicitly approves/edits them.
     """
-    def __init__(self, server_script: str = "skills_mcp_server.py"):
+    def __init__(self):
+        # Run as a module (-m) instead of a direct file path so it respects your __init__.py packages
         self.server_params = StdioServerParameters(
             command=sys.executable,
-            args=[server_script],
+            args=["-m", "mcp_server.skill_mcp_server"],
             env=None
         )
 
