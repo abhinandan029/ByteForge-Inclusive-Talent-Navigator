@@ -1,0 +1,44 @@
+[
+  {
+    "skill": "Python",
+    "demand_level": "High",
+    "trend": "Rising (+18% YoY)",
+    "open_internal_roles": 6,
+    "market_note": "Core requirement across backend, data engineering, and AI automation teams."
+  },
+  {
+    "skill": "Machine Learning",
+    "demand_level": "High",
+    "trend": "Surging (+32% YoY)",
+    "open_internal_roles": 4,
+    "market_note": "High internal priority for BTP AI agent and predictive analytics initiatives."
+  },
+  {
+    "skill": "Data Analysis",
+    "demand_level": "High",
+    "trend": "Stable (+12% YoY)",
+    "open_internal_roles": 5,
+    "market_note": "Strong demand across product engineering and business intelligence units."
+  },
+  {
+    "skill": "Pandas",
+    "demand_level": "Medium",
+    "trend": "Stable (+9% YoY)",
+    "open_internal_roles": 4,
+    "market_note": "Frequently paired with Python for data pipeline and ETL roles."
+  },
+  {
+    "skill": "Communication",
+    "demand_level": "High",
+    "trend": "Rising (+15% YoY)",
+    "open_internal_roles": 8,
+    "market_note": "Essential for cross-functional product and technical lead tracks."
+  },
+  {
+    "skill": "SAP BTP",
+    "demand_level": "High",
+    "trend": "Surging (+40% YoY)",
+    "open_internal_roles": 5,
+    "market_note": "Key growth skill for enterprise cloud and generative AI integration."
+  }
+]

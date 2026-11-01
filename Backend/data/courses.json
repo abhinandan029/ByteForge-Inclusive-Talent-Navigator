@@ -1,0 +1,30 @@
+[
+  {
+    "course_id": "SAP_BTP_101",
+    "title": "SAP Business Technology Platform Essentials & AI Integration",
+    "target_skill": "SAP BTP",
+    "duration": "4 hours",
+    "sap_learning_hub_url": "https://learning.sap.com/courses/btp-essentials-ai"
+  },
+  {
+    "course_id": "ML_ADV_202",
+    "title": "Advanced Machine Learning Pipelines & Model Deployment",
+    "target_skill": "Machine Learning",
+    "duration": "6 hours",
+    "sap_learning_hub_url": "https://learning.sap.com/courses/advanced-ml-pipelines"
+  },
+  {
+    "course_id": "CLOUD_FOUNDRY_301",
+    "title": "Cloud Foundry and Docker Enterprise Microservices",
+    "target_skill": "Cloud Foundry",
+    "duration": "5 hours",
+    "sap_learning_hub_url": "https://learning.sap.com/courses/cloud-foundry-deployments"
+  },
+  {
+    "course_id": "PYTHON_FASTAPI_01",
+    "title": "Building Scalable Enterprise APIs with FastAPI",
+    "target_skill": "FastAPI",
+    "duration": "3 hours",
+    "sap_learning_hub_url": "https://learning.sap.com/courses/fastapi-microservices"
+  }
+]
