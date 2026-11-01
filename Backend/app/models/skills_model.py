@@ -1,4 +1,6 @@
 
+import json
+
 from app.database.connection import (
     get_connection,
     release_connection,
@@ -11,9 +13,17 @@ from app.database.connection import (
 # ==================================================
 
 def _fetch_all(cursor):
-    columns = [column[0].lower() for column in cursor.description]
+    columns = [
+        column[0].lower()
+        for column in cursor.description
+    ]
+
     rows = cursor.fetchall()
-    return [dict(zip(columns, row)) for row in rows]
+
+    return [
+        dict(zip(columns, row))
+        for row in rows
+    ]
 
 
 def _fetch_one(cursor):
@@ -22,7 +32,11 @@ def _fetch_one(cursor):
     if row is None:
         return None
 
-    columns = [column[0].lower() for column in cursor.description]
+    columns = [
+        column[0].lower()
+        for column in cursor.description
+    ]
+
     return dict(zip(columns, row))
 
 
@@ -39,7 +53,9 @@ def _close_resources(cursor=None, conn=None):
 
 def _to_bool(value):
     if isinstance(value, str):
-        return value.strip().lower() in ("1", "true", "yes")
+        return value.strip().lower() in (
+            "1", "true", "yes"
+        )
 
     return bool(value)
 
@@ -68,7 +84,13 @@ def _add_audit_log(
         )
         VALUES (?, ?, ?, ?, ?)
         """,
-        (employee_id, actor, action, tool, details)
+        (
+            employee_id,
+            actor,
+            action,
+            tool,
+            details
+        )
     )
 
 
@@ -101,6 +123,10 @@ def _get_confirmed_skill_names(cursor, employee_id):
         if row[0]
     }
 
+
+# ==================================================
+# GET EMPLOYEE PROFILE TEXT
+# ==================================================
 
 def get_employee_profile_text(employee_id):
     conn = None
@@ -150,7 +176,7 @@ def save_extracted_skills(employee_id, extracted_skills):
         cursor = conn.cursor()
 
         if not _get_employee(cursor, employee_id):
-            raise ValueError("Employee not found")
+            raise ValueError("Employee not found.")
 
         confirmed_names = _get_confirmed_skill_names(
             cursor,
@@ -180,7 +206,7 @@ def save_extracted_skills(employee_id, extracted_skills):
                 )
             })
 
-        print("\n========== HANA SAVE DEBUG ==========")
+        print("\n========== SKILLS SAVE DEBUG ==========")
         print("Employee ID:", employee_id)
         print("Extracted skills count:", len(extracted_skills))
         print("Confirmed names:", confirmed_names)
@@ -189,10 +215,10 @@ def save_extracted_skills(employee_id, extracted_skills):
         for skill in pending_skills:
             print("Pending:", skill["skill_id"], skill["name"])
 
-        print("====================================\n")    
+        print("=======================================\n")
 
         # Replace pending proposals only.
-        # Existing confirmed skills are never deleted.
+        # Previously confirmed skills are never deleted.
         cursor.execute(
             """
             DELETE FROM EXTRACTED_SKILLS_DRAFT
@@ -222,9 +248,13 @@ def save_extracted_skills(employee_id, extracted_skills):
                     skill["evidence_snippet"]
                 )
             )
-            print("Inserted:", skill["skill_id"], skill["name"])
 
-        # Do not reset confirmation or matching flags.
+            print(
+                "Inserted:",
+                skill["skill_id"],
+                skill["name"]
+            )
+
         _add_audit_log(
             cursor,
             employee_id,
@@ -256,10 +286,21 @@ def save_extracted_skills(employee_id, extracted_skills):
 
 
 # ==================================================
-# SAVE CONFIRMED SKILLS
+# SAVE FINAL CONFIRMED SKILLS
 # ==================================================
 
 def save_confirmed_skills(employee_id, confirmed_skills):
+    """
+    Save the employee's final skill selection.
+
+    - Preserve previously confirmed skills.
+    - Save accepted extracted skills.
+    - Save manually added skills.
+    - Delete all reviewed pending drafts, including rejected skills.
+    - Mark the review as completed.
+    - Enable matching only when at least one skill is confirmed.
+    """
+
     conn = None
     cursor = None
 
@@ -268,9 +309,9 @@ def save_confirmed_skills(employee_id, confirmed_skills):
         cursor = conn.cursor()
 
         if not _get_employee(cursor, employee_id):
-            raise ValueError("Employee not found")
+            raise ValueError("Employee not found.")
 
-        # Read currently pending skills.
+        # Get all pending skills before modifying them.
         cursor.execute(
             """
             SELECT
@@ -292,26 +333,43 @@ def save_confirmed_skills(employee_id, confirmed_skills):
             if skill.get("name")
         }
 
-        # Existing confirmed skills must be preserved.
+        submitted_names = {
+            _normalize_skill_name(skill.get("name"))
+            for skill in confirmed_skills
+            if skill.get("name")
+        }
+
+        # Track suggestions rejected by the employee.
+        removed_names = [
+            skill["name"]
+            for skill in draft_rows
+            if _normalize_skill_name(skill["name"])
+            not in submitted_names
+        ]
+
         existing_confirmed_names = _get_confirmed_skill_names(
             cursor,
             employee_id
         )
 
         newly_confirmed = []
+        manually_added = []
         seen_names = set()
 
         for submitted_skill in confirmed_skills:
             name = (submitted_skill.get("name") or "").strip()
+
+            if not name:
+                continue
+
             normalized_name = _normalize_skill_name(name)
 
-            if not name or normalized_name in seen_names:
+            if normalized_name in seen_names:
                 continue
 
             seen_names.add(normalized_name)
 
-            # If the skill is an extracted draft, use the database
-            # values rather than trusting client-supplied metadata.
+            # Use database evidence for an extracted skill.
             draft_skill = draft_by_name.get(normalized_name)
 
             if draft_skill:
@@ -324,10 +382,9 @@ def save_confirmed_skills(employee_id, confirmed_skills):
                         draft_skill.get("evidence_snippet") or ""
                     )
                 }
+
             else:
-                # Skills manually added by the employee are not
-                # necessarily present in the draft table.
-                # Accept them as manual confirmations.
+                # This skill was added by the employee.
                 skill_to_save = {
                     "name": name,
                     "taxonomy_category": (
@@ -335,50 +392,49 @@ def save_confirmed_skills(employee_id, confirmed_skills):
                     ),
                     "evidence_snippet": (
                         submitted_skill.get("evidence_snippet")
-                        or "Added by employee"
+                        or "Self-reported and confirmed by employee"
                     )
                 }
 
-            # Never insert an already-confirmed skill again.
-            if normalized_name not in existing_confirmed_names:
-                cursor.execute(
-                    """
-                    INSERT INTO CONFIRMED_SKILLS_FINAL
-                    (
-                        EMPLOYEE_ID,
-                        NAME,
-                        TAXONOMY_CATEGORY,
-                        EVIDENCE_SNIPPET
-                    )
-                    VALUES (?, ?, ?, ?)
-                    """,
-                    (
-                        employee_id,
-                        skill_to_save["name"],
-                        skill_to_save["taxonomy_category"],
-                        skill_to_save["evidence_snippet"]
-                    )
+                manually_added.append(name)
+
+            # Prevent duplicate confirmed skills.
+            if normalized_name in existing_confirmed_names:
+                continue
+
+            cursor.execute(
+                """
+                INSERT INTO CONFIRMED_SKILLS_FINAL
+                (
+                    EMPLOYEE_ID,
+                    NAME,
+                    TAXONOMY_CATEGORY,
+                    EVIDENCE_SNIPPET
                 )
-
-                existing_confirmed_names.add(normalized_name)
-                newly_confirmed.append(skill_to_save)
-
-            # Delete only the submitted skill's draft, if it exists.
-            # Other pending skills remain untouched.
-            if draft_skill:
-                cursor.execute(
-                    """
-                    DELETE FROM EXTRACTED_SKILLS_DRAFT
-                    WHERE EMPLOYEE_ID = ?
-                      AND SKILL_ID = ?
-                    """,
-                    (
-                        employee_id,
-                        draft_skill["skill_id"]
-                    )
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    employee_id,
+                    skill_to_save["name"],
+                    skill_to_save["taxonomy_category"],
+                    skill_to_save["evidence_snippet"]
                 )
+            )
 
-        # Derive flags from the actual confirmed table.
+            existing_confirmed_names.add(normalized_name)
+            newly_confirmed.append(skill_to_save)
+
+        # The employee has reviewed the entire pending list.
+        # Delete accepted AND rejected pending suggestions.
+        cursor.execute(
+            """
+            DELETE FROM EXTRACTED_SKILLS_DRAFT
+            WHERE EMPLOYEE_ID = ?
+            """,
+            (employee_id,)
+        )
+
+        # Count every confirmed skill, including earlier confirmations.
         cursor.execute(
             """
             SELECT COUNT(*)
@@ -388,9 +444,11 @@ def save_confirmed_skills(employee_id, confirmed_skills):
             (employee_id,)
         )
 
-        confirmed_count = cursor.fetchone()[0]
-        has_confirmed_skills = confirmed_count > 0
+        total_confirmed = cursor.fetchone()[0]
 
+        ready_for_matching = total_confirmed > 0
+
+        # A completed review and matching readiness are separate states.
         cursor.execute(
             """
             UPDATE EMPLOYEES
@@ -401,11 +459,36 @@ def save_confirmed_skills(employee_id, confirmed_skills):
             WHERE EMPLOYEE_ID = ?
             """,
             (
-                1 if has_confirmed_skills else 0,
-                1 if has_confirmed_skills else 0,
+                1,
+                1 if ready_for_matching else 0,
                 employee_id
             )
         )
+
+        # Retrieve the complete final confirmed list.
+        cursor.execute(
+            """
+            SELECT
+                NAME,
+                TAXONOMY_CATEGORY,
+                EVIDENCE_SNIPPET
+            FROM CONFIRMED_SKILLS_FINAL
+            WHERE EMPLOYEE_ID = ?
+            ORDER BY NAME
+            """,
+            (employee_id,)
+        )
+
+        final_confirmed_skills = _fetch_all(cursor)
+
+        # Record additions and removals in the database audit log.
+        audit_details = json.dumps({
+            "newly_confirmed_count": len(newly_confirmed),
+            "total_confirmed_count": total_confirmed,
+            "manually_added": manually_added,
+            "removed_skills": removed_names,
+            "ready_for_matching": ready_for_matching
+        })
 
         _add_audit_log(
             cursor,
@@ -413,17 +496,18 @@ def save_confirmed_skills(employee_id, confirmed_skills):
             "EMPLOYEE",
             "SKILLS_CONFIRMED",
             "SKILLS_DISCOVERY",
-            f"{len(newly_confirmed)} new skills confirmed"
+            audit_details
         )
 
         conn.commit()
 
         return {
             "success": True,
-            "confirmed_count": len(newly_confirmed),
-            "confirmed_skills": newly_confirmed,
-            "is_confirmed": has_confirmed_skills,
-            "ready_for_matching": has_confirmed_skills
+            "confirmed_count": total_confirmed,
+            "newly_confirmed_count": len(newly_confirmed),
+            "confirmed_skills": final_confirmed_skills,
+            "is_confirmed": True,
+            "ready_for_matching": ready_for_matching
         }
 
     except Exception:
@@ -467,7 +551,7 @@ def get_employee_skills(employee_id):
         employee = _fetch_one(cursor)
 
         if not employee:
-            raise ValueError("Employee not found")
+            raise ValueError("Employee not found.")
 
         employee["has_career_break"] = _to_bool(
             employee["has_career_break"]
@@ -519,7 +603,7 @@ def get_employee_skills(employee_id):
 
         all_drafts = _fetch_all(cursor)
 
-        # Never show a confirmed skill as pending.
+        # Do not show confirmed skills as pending.
         draft_skills = [
             skill
             for skill in all_drafts
@@ -527,16 +611,8 @@ def get_employee_skills(employee_id):
             not in confirmed_names
         ]
 
-        has_confirmed_skills = bool(confirmed_skills)
-
-        # Confirmed table is the source of truth.
-        employee["is_confirmed"] = has_confirmed_skills
-
-        employee["ready_for_matching"] = (
-            employee["ready_for_matching"]
-            and has_confirmed_skills
-        )
-
+        # Keep the employee review flag from EMPLOYEES.
+        # Do not infer it from whether the confirmed table is empty.
         return {
             "employee": employee,
             "employee_id": employee_id,
@@ -578,6 +654,7 @@ def get_audit_logs(employee_id=None):
                 """,
                 (employee_id,)
             )
+
         else:
             cursor.execute(
                 """

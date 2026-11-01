@@ -55,23 +55,26 @@ async def extract_skills_controller(payload):
         )
 
     try:
-        # Fetch profile text from the database.
+        # Always retrieve the profile text from the database.
         profile_text = await run_in_threadpool(
             get_employee_profile_text,
             employee_id
         )
-        
+
         agent_result = await skills_agent.discover_skills(
             employee_id=employee_id,
             profile_text=profile_text.strip()
         )
 
-        proposed_skills = agent_result.get("proposed_skills", [])
+        proposed_skills = agent_result.get(
+            "proposed_skills",
+            []
+        )
 
-        print("\n========== CONTROLLER RESULT =======")
+        print("\n========== CONTROLLER RESULT ========")
         print("Proposed skills:", proposed_skills)
         print("Count:", len(proposed_skills))
-        print("====================================\n")
+        print("=====================================\n")
 
         if not isinstance(proposed_skills, list):
             raise ValueError(
@@ -139,7 +142,9 @@ async def extract_skills_controller(payload):
         )
 
     except Exception as error:
-        print(f"[SKILLS EXTRACTION ERROR] {repr(error)}")
+        print(
+            f"[SKILLS EXTRACTION ERROR] {repr(error)}"
+        )
         traceback.print_exc()
 
         raise HTTPException(
@@ -161,15 +166,39 @@ async def confirm_skills_controller(payload):
             detail="Employee ID is required."
         )
 
-    if not payload.confirmed_skills:
-        raise HTTPException(
-            status_code=400,
-            detail="At least one skill must be confirmed."
+    try:
+        # Read the existing employee state and pending drafts.
+        current_state = await run_in_threadpool(
+            get_employee_skills,
+            employee_id
         )
 
-    try:
-        confirmed_skills = []
-        seen_skills = set()
+        employee = current_state["employee"]
+
+        current_drafts = current_state[
+            "extracted_skills_draft"
+        ]
+
+        already_confirmed = current_state[
+            "confirmed_skills_final"
+        ]
+
+        # Build a lookup of actual database drafts.
+        draft_by_name = {
+            skill["name"].strip().casefold(): skill
+            for skill in current_drafts
+            if skill.get("name")
+        }
+
+        existing_confirmed_names = {
+            skill["name"].strip().casefold()
+            for skill in already_confirmed
+            if skill.get("name")
+        }
+
+        # Validate and deduplicate the employee's final selection.
+        submitted_skills = []
+        seen_names = set()
 
         for skill in payload.confirmed_skills:
             name = (skill.name or "").strip()
@@ -179,39 +208,100 @@ async def confirm_skills_controller(payload):
 
             normalized_name = name.casefold()
 
-            if normalized_name in seen_skills:
+            if normalized_name in seen_names:
                 continue
 
-            seen_skills.add(normalized_name)
+            seen_names.add(normalized_name)
 
-            confirmed_skills.append({
+            submitted_skills.append({
                 "name": name,
                 "taxonomy_category": (
                     skill.taxonomy_category or "General"
                 ),
                 "evidence_snippet": (
                     skill.evidence_snippet or ""
-                ),
+                )
             })
 
-        if not confirmed_skills:
-            raise HTTPException(
-                status_code=400,
-                detail="No valid skills were provided."
+        selected_names = {
+            skill["name"].casefold()
+            for skill in submitted_skills
+        }
+
+        # Only accept extracted skills that actually exist in the
+        # employee's current pending draft table.
+        accepted_skills = [
+            draft_by_name[skill["name"].casefold()]
+            for skill in submitted_skills
+            if skill["name"].casefold() in draft_by_name
+        ]
+
+        # Names that are neither pending nor already confirmed
+        # are manual skills added by the employee.
+        added_raw_skills = [
+            skill["name"]
+            for skill in submitted_skills
+            if skill["name"].casefold() not in draft_by_name
+            and skill["name"].casefold()
+            not in existing_confirmed_names
+        ]
+
+        # Identify pending suggestions the employee rejected.
+        removed_skill_ids = [
+            skill["skill_id"]
+            for skill in current_drafts
+            if skill["name"].strip().casefold()
+            not in selected_names
+        ]
+
+        # Send accepted skills and manual additions through the
+        # existing Skills Discovery MCP agent.
+        #
+        # Avoid creating a misleading local agent confirmation event
+        # when the employee has no confirmed skills and selects none.
+        if (
+            accepted_skills
+            or added_raw_skills
+            or already_confirmed
+        ):
+            agent_result = await skills_agent.confirm_employee_skills(
+                employee_id=employee_id,
+                employee_name=employee.get(
+                    "full_name",
+                    employee_id
+                ),
+                accepted_skills=accepted_skills,
+                added_raw_skills=added_raw_skills,
+                removed_skill_ids=removed_skill_ids
             )
 
+            final_skills = agent_result.get(
+                "confirmed_skills",
+                []
+            )
+
+        else:
+            final_skills = []
+
+        # Persist the final employee selection.
         result = await run_in_threadpool(
             save_confirmed_skills,
             employee_id,
-            confirmed_skills
+            final_skills
         )
+
+        ready = result["ready_for_matching"]
 
         return SkillConfirmResponse(
             employee_id=employee_id,
-            status="CONFIRMED_READY_FOR_MATCHING",
+            status=(
+                "CONFIRMED_READY_FOR_MATCHING"
+                if ready
+                else "CONFIRMED_NOT_READY_FOR_MATCHING"
+            ),
             confirmed_count=result["confirmed_count"],
-            ready_for_matching=result["ready_for_matching"],
-            confirmed_skills=result["confirmed_skills"],
+            ready_for_matching=ready,
+            confirmed_skills=result["confirmed_skills"]
         )
 
     except HTTPException:

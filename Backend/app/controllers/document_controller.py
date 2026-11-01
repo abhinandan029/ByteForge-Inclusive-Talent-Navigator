@@ -1,10 +1,14 @@
+
 import os
 
 from fastapi import UploadFile, HTTPException
 
 from app.models.document_model import (
     save_document,
-    rebuild_employee_profile_text
+    get_employee_documents,
+    rebuild_employee_profile_text,
+    delete_employee_document,
+    employee_exists
 )
 
 from app.utils.document_extractor import extract_document_text
@@ -25,13 +29,21 @@ async def upload_documents_controller(
 ):
     """
     Validate, extract and save employee documents.
-    Rebuild employee PROFILE_TEXT after successful uploads.
+    Rebuild PROFILE_TEXT after uploads or duplicate detection.
     """
 
     if not employee_id or not employee_id.strip():
         raise HTTPException(
             status_code=400,
             detail="Employee ID is required."
+        )
+
+    employee_id = employee_id.strip()
+
+    if not employee_exists(employee_id):
+        raise HTTPException(
+            status_code=404,
+            detail="Employee not found."
         )
 
     if not files:
@@ -47,26 +59,29 @@ async def upload_documents_controller(
         )
 
     successful_uploads = []
+    duplicate_documents = []
     failed_uploads = []
 
     for file in files:
 
-        file_name = file.filename or "unnamed"
+        original_file_name = file.filename or "unnamed"
+        safe_file_name = os.path.basename(
+            original_file_name.replace("\\", "/")
+        )
 
         try:
-            # Get and validate the file extension.
-            safe_file_name = os.path.basename(
-                file_name.replace("\\", "/")
-            )
+            # 1. Validate the filename and extension.
+            if "." not in safe_file_name:
+                raise ValueError("File extension is missing.")
 
             extension = safe_file_name.rsplit(".", 1)[-1].lower()
 
-            if "." not in safe_file_name or extension not in ALLOWED_EXTENSIONS:
+            if extension not in ALLOWED_EXTENSIONS:
                 raise ValueError(
                     "Unsupported file format. Upload PDF or DOCX only."
                 )
 
-            # Read file content with a size limit.
+            # 2. Read and validate file size.
             file_content = await file.read(MAX_FILE_SIZE + 1)
 
             if not file_content:
@@ -75,7 +90,7 @@ async def upload_documents_controller(
             if len(file_content) > MAX_FILE_SIZE:
                 raise ValueError("File size exceeds the 10 MB limit.")
 
-            # Extract document text.
+            # 3. Extract and clean document text.
             extracted_text = extract_document_text(
                 file_content,
                 safe_file_name
@@ -87,31 +102,37 @@ async def upload_documents_controller(
                     "Scanned PDFs are not supported yet."
                 )
 
-            # Save the original file and extracted text.
-            result = save_document(
-                employee_id=employee_id,
-                file_name=safe_file_name,
-                document_type=extension.upper(),
-                mime_type=(
-                    file.content_type or "application/octet-stream"
-                ),
-                file_content=file_content,
-                extracted_text=extracted_text
-            )
-
-            successful_uploads.append(result)
-
         except Exception as exc:
             failed_uploads.append({
-                "file_name": file_name,
+                "file_name": original_file_name,
                 "error": str(exc)
             })
+
+            continue
 
         finally:
             await file.close()
 
-    # If no document was successfully saved, return an error.
-    if not successful_uploads:
+        # Database errors are intentionally not swallowed as
+        # individual file-validation failures.
+        result = save_document(
+            employee_id=employee_id,
+            file_name=safe_file_name,
+            document_type=extension.upper(),
+            mime_type=(
+                file.content_type or "application/octet-stream"
+            ),
+            file_content=file_content,
+            extracted_text=extracted_text
+        )
+
+        if result["is_duplicate"]:
+            duplicate_documents.append(result)
+        else:
+            successful_uploads.append(result)
+
+    # All files failed validation.
+    if not successful_uploads and not duplicate_documents:
         raise HTTPException(
             status_code=400,
             detail={
@@ -120,7 +141,8 @@ async def upload_documents_controller(
             }
         )
 
-    # Rebuild PROFILE_TEXT after successful uploads.
+    # Rebuild even if all uploads were duplicates.
+    # This also cleans text belonging to older stored documents.
     try:
         rebuild_employee_profile_text(employee_id)
 
@@ -128,7 +150,7 @@ async def upload_documents_controller(
         raise HTTPException(
             status_code=500,
             detail=(
-                "Documents were saved, but employee profile text "
+                "Documents were processed, but employee profile text "
                 f"could not be rebuilt: {str(exc)}"
             )
         )
@@ -138,7 +160,59 @@ async def upload_documents_controller(
         "message": "Document upload completed.",
         "employee_id": employee_id,
         "uploaded_count": len(successful_uploads),
+        "duplicate_count": len(duplicate_documents),
         "failed_count": len(failed_uploads),
         "uploaded_documents": successful_uploads,
+        "duplicate_documents": duplicate_documents,
         "failed_uploads": failed_uploads
+    }
+
+
+def get_employee_documents_controller(employee_id: str):
+    """Return the metadata of an employee's uploaded documents."""
+
+    if not employee_exists(employee_id):
+        raise HTTPException(
+            status_code=404,
+            detail="Employee not found."
+        )
+
+    documents = get_employee_documents(employee_id)
+
+    return {
+        "success": True,
+        "employee_id": employee_id,
+        "document_count": len(documents),
+        "documents": documents
+    }
+
+
+def delete_employee_document_controller(
+    employee_id: str,
+    document_id: str
+):
+    """Delete an employee's document and rebuild their profile."""
+
+    if not employee_exists(employee_id):
+        raise HTTPException(
+            status_code=404,
+            detail="Employee not found."
+        )
+
+    deleted = delete_employee_document(
+        employee_id,
+        document_id
+    )
+
+    if not deleted:
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found for this employee."
+        )
+
+    return {
+        "success": True,
+        "message": "Document deleted and employee profile updated.",
+        "employee_id": employee_id,
+        "document_id": document_id
     }

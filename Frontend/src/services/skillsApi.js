@@ -55,7 +55,9 @@ export async function extractSkills(payload) {
 
   return request(`${API_BASE_URL}/extract`, {
     method: "POST",
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      employee_id: payload.employee_id,
+    }),
   });
 }
 
@@ -75,7 +77,10 @@ export async function confirmSkills(payload) {
 
   return request(`${API_BASE_URL}/confirm`, {
     method: "POST",
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      employee_id: payload.employee_id,
+      confirmed_skills: payload.confirmed_skills,
+    }),
   });
 }
 
@@ -92,9 +97,6 @@ export async function getSkillsAuditLogs() {
 // ==================================================
 // CACHE COMPATIBILITY HELPERS
 // ==================================================
-
-// Kept so existing imports elsewhere do not break.
-// This API service no longer caches employee skills.
 
 export function invalidateEmployeeSkills() {
   // No cache to invalidate.

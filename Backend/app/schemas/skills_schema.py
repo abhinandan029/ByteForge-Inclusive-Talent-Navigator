@@ -10,6 +10,7 @@ from typing import Optional
 class ProfileExtractRequest(BaseModel):
     employee_id: str
 
+
 class SkillItem(BaseModel):
     skill_id: str
     name: str
@@ -36,8 +37,10 @@ class SkillConfirmationItem(BaseModel):
 
 class SkillConfirmRequest(BaseModel):
     employee_id: str
+
+    # Allows an employee to reject every pending suggestion.
     confirmed_skills: list[SkillConfirmationItem] = Field(
-        min_length=1
+        default_factory=list
     )
 
 
