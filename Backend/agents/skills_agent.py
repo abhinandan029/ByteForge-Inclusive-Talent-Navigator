@@ -62,6 +62,10 @@ class SkillsDiscoveryAgent:
                 extract_res = await session.call_tool("extract_skills", arguments={"text": profile_text})
                 extract_payload = json.loads(extract_res.content[0].text)
 
+                print("\n========== MCP EXTRACTION ==========")
+                print(json.dumps(extract_payload, indent=2))
+                print("====================================\n")
+
                 record_audit_event(
                     actor="SkillsDiscoveryAgent",
                     action="MCP_TOOL_CALL",
@@ -78,6 +82,10 @@ class SkillsDiscoveryAgent:
                 raw_items_str = json.dumps(extract_payload["extracted_items"])
                 norm_res = await session.call_tool("normalize_skills", arguments={"raw_skills_json": raw_items_str})
                 norm_payload = json.loads(norm_res.content[0].text)
+
+                print("\n========== MCP NORMALIZATION =======")
+                print(json.dumps(norm_payload, indent=2))
+                print("====================================\n")
 
                 record_audit_event(
                     actor="SkillsDiscoveryAgent",

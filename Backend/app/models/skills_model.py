@@ -145,6 +145,17 @@ def save_extracted_skills(employee_id, extracted_skills):
                 )
             })
 
+        print("\n========== HANA SAVE DEBUG ==========")
+        print("Employee ID:", employee_id)
+        print("Extracted skills count:", len(extracted_skills))
+        print("Confirmed names:", confirmed_names)
+        print("Pending skills count:", len(pending_skills))
+
+        for skill in pending_skills:
+            print("Pending:", skill["skill_id"], skill["name"])
+
+        print("====================================\n")    
+
         # Replace pending proposals only.
         # Existing confirmed skills are never deleted.
         cursor.execute(
@@ -176,6 +187,7 @@ def save_extracted_skills(employee_id, extracted_skills):
                     skill["evidence_snippet"]
                 )
             )
+            print("Inserted:", skill["skill_id"], skill["name"])
 
         # Do not reset confirmation or matching flags.
         _add_audit_log(

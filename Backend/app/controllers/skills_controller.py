@@ -68,6 +68,11 @@ async def extract_skills_controller(payload):
 
         proposed_skills = agent_result.get("proposed_skills", [])
 
+        print("\n========== CONTROLLER RESULT =======")
+        print("Proposed skills:", proposed_skills)
+        print("Count:", len(proposed_skills))
+        print("====================================\n")
+
         if not isinstance(proposed_skills, list):
             raise ValueError(
                 "The skills agent returned an invalid skills list."
