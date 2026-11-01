@@ -1,16 +1,32 @@
 
 import { Routes, Route, Outlet, Navigate } from "react-router-dom";
 
+// Employee components
 import Header from "./components/Header.jsx";
 import Sidebar from "./components/Sidebar.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 
-import { useAuth } from "./contexts/AuthContext";
+// HR components
+import HRHeader from "./components/HRHeader.jsx";
+import HRSidebar from "./components/HRSidebar.jsx";
+import HRProtectedRoute from "./components/HRProtectedRoute.jsx";
 
+// Authentication contexts
+import { useAuth } from "./contexts/AuthContext";
+import {
+  HRAuthProvider,
+  useHRAuth,
+} from "./contexts/HRAuthContext";
+
+// Employee pages
 import LoginPage from "./pages/LoginPage.jsx";
 import ChangePasswordPage from "./pages/ChangePasswordPage.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import SkillsPage from "./pages/SkillsPage.jsx";
+
+// HR pages
+import HRDashboard from "./pages/HRDashboard.jsx";
+import HRBiasAudit from "./pages/HRBiasAudit.jsx";
 
 
 // ==================================================
@@ -41,21 +57,24 @@ function PlaceholderPage({ title, description }) {
 
 
 // ==================================================
-// MAIN APPLICATION LAYOUT
+// EMPLOYEE APPLICATION LAYOUT
 // ==================================================
 
 function AppLayout() {
   return (
     <div className="flex h-screen flex-col overflow-hidden">
 
+      {/* Employee Header */}
       <div className="z-50 h-16 shrink-0">
         <Header />
       </div>
 
       <div className="relative flex min-h-0 flex-1 overflow-hidden">
 
+        {/* Employee Sidebar */}
         <Sidebar />
 
+        {/* Employee Main Content */}
         <main className="min-h-0 w-full flex-1 overflow-y-auto lg:ml-60">
           <Outlet />
         </main>
@@ -67,14 +86,67 @@ function AppLayout() {
 
 
 // ==================================================
-// ROUTE GUARDS
+// HR APPLICATION LAYOUT
+// ==================================================
+
+function HRLayout() {
+  return (
+    <div className="flex h-screen flex-col overflow-hidden">
+
+      {/* HR Header */}
+      <div className="z-50 h-16 shrink-0">
+        <HRHeader />
+      </div>
+
+      <div className="relative flex min-h-0 flex-1 overflow-hidden">
+
+        {/* HR Sidebar */}
+        <HRSidebar />
+
+        {/* HR Main Content */}
+        <main className="min-h-0 w-full flex-1 overflow-y-auto">
+          <Outlet />
+        </main>
+
+      </div>
+    </div>
+  );
+}
+
+
+// ==================================================
+// PUBLIC LOGIN ROUTE
 // ==================================================
 
 function LoginRoute() {
-  const { employee, loading } = useAuth();
+  const {
+    employee,
+    loading: employeeLoading,
+  } = useAuth();
 
-  if (loading) return null;
+  const {
+    hr,
+    loading: hrLoading,
+  } = useHRAuth();
 
+  // Wait until both authentication contexts
+  // finish restoring their sessions.
+  if (employeeLoading || hrLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <p className="text-sm text-slate-500">
+          Checking session...
+        </p>
+      </div>
+    );
+  }
+
+  // HR users go to the HR workspace.
+  if (hr) {
+    return <Navigate to="/hr/dashboard" replace />;
+  }
+
+  // Employee users go to the employee workspace.
   if (employee) {
     return (
       <Navigate
@@ -92,8 +164,15 @@ function LoginRoute() {
 }
 
 
+// ==================================================
+// EMPLOYEE PASSWORD CHANGE ROUTE
+// ==================================================
+
 function PasswordChangeRoute() {
-  const { employee, loading } = useAuth();
+  const {
+    employee,
+    loading,
+  } = useAuth();
 
   if (loading) return null;
 
@@ -110,39 +189,53 @@ function PasswordChangeRoute() {
 
 
 // ==================================================
-// APP ROUTES
+// APPLICATION ROUTES
 // ==================================================
 
-function App() {
+function AppRoutes() {
   return (
     <Routes>
 
-      {/* PUBLIC LOGIN - NO HEADER OR SIDEBAR */}
+      {/* ==================================================
+          PUBLIC LOGIN
+          ================================================== */}
+
       <Route
         path="/"
         element={<LoginRoute />}
       />
 
-      {/* FIRST-TIME PASSWORD CHANGE */}
+
+      {/* ==================================================
+          EMPLOYEE PASSWORD CHANGE
+          ================================================== */}
+
       <Route
         path="/change-password"
         element={<PasswordChangeRoute />}
       />
 
-      {/* PROTECTED APPLICATION */}
+
+      {/* ==================================================
+          EMPLOYEE WORKSPACE
+          ================================================== */}
+
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
 
+          {/* Employee Dashboard */}
           <Route
             path="/dashboard"
             element={<Dashboard />}
           />
 
+          {/* Skills Discovery */}
           <Route
             path="/skills"
             element={<SkillsPage />}
           />
 
+          {/* Role Matching */}
           <Route
             path="/matching"
             element={
@@ -153,6 +246,7 @@ function App() {
             }
           />
 
+          {/* Employee Fairness Review */}
           <Route
             path="/bias-audit"
             element={
@@ -163,6 +257,7 @@ function App() {
             }
           />
 
+          {/* Learning Path */}
           <Route
             path="/learning"
             element={
@@ -173,6 +268,7 @@ function App() {
             }
           />
 
+          {/* Audit Log */}
           <Route
             path="/audit-log"
             element={
@@ -186,13 +282,53 @@ function App() {
         </Route>
       </Route>
 
-      {/* UNKNOWN ROUTES */}
+
+      {/* ==================================================
+          HR PARTNER WORKSPACE
+          ================================================== */}
+
+      <Route element={<HRProtectedRoute />}>
+        <Route element={<HRLayout />}>
+
+          {/* HR Dashboard */}
+          <Route
+            path="/hr/dashboard"
+            element={<HRDashboard />}
+          />
+
+          {/* HR Bias Audit */}
+          <Route
+            path="/hr/bias-audit"
+            element={<HRBiasAudit />}
+          />
+
+        </Route>
+      </Route>
+
+
+      {/* ==================================================
+          UNKNOWN ROUTES
+          ================================================== */}
+
       <Route
         path="*"
         element={<Navigate to="/" replace />}
       />
 
     </Routes>
+  );
+}
+
+
+// ==================================================
+// MAIN APPLICATION
+// ==================================================
+
+function App() {
+  return (
+    <HRAuthProvider>
+      <AppRoutes />
+    </HRAuthProvider>
   );
 }
 
