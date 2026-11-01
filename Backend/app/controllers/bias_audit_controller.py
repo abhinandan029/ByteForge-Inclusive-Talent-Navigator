@@ -1,365 +1,472 @@
 
+from agents.bias_agent import run_bias_audit
+
 from app.models.bias_audit_model import (
+    get_bias_audit_inputs,
     create_bias_audit_flags,
-    get_bias_audit_flags,
-    get_bias_audit_flag_by_id,
-    review_bias_audit_flag,
-    create_hr_match_decision,
-    get_hr_match_decisions
+    get_bias_audit_flags as fetch_bias_audit_flags,
+    get_bias_audit_flag_by_id as fetch_bias_audit_flag_by_id,
+    review_bias_audit_flag as save_bias_audit_review,
+    create_hr_match_decision as save_hr_match_decision,
+    get_hr_match_decisions as fetch_hr_match_decisions,
 )
 
 
-# --------------------------------------------------
-# CONSTANTS
-# --------------------------------------------------
+# ---------------------------------------------------------------------
+# Validation constants
+# ---------------------------------------------------------------------
 
 VALID_REVIEW_STATUSES = {
     "concerning",
-    "not_concerning"
+    "not_concerning",
 }
 
 VALID_MATCH_DECISIONS = {
     "shortlist",
     "reject",
     "hold",
-    "needs_further_review"
+    "needs_further_review",
 }
 
-LOW_MATCH_SCORE_THRESHOLD = 50.0
 
+# ---------------------------------------------------------------------
+# Database result normalization
+# ---------------------------------------------------------------------
 
-# --------------------------------------------------
-# HELPER FUNCTIONS
-# --------------------------------------------------
+def _normalize_flag(row):
+    """Convert database column names into API field names."""
 
-def get_value(data, key, default=None):
-    """
-    Supports both dictionary results and Pydantic objects.
-    """
-    if isinstance(data, dict):
-        return data.get(key, default)
-
-    return getattr(data, key, default)
-
-
-def normalize_skill_list(skills):
-    if not skills:
-        return []
-
-    return [
-        str(skill).strip()
-        for skill in skills
-        if skill and str(skill).strip()
-    ]
-
-
-# --------------------------------------------------
-# AUTOMATIC BIAS AUDIT RULES
-# --------------------------------------------------
-
-def evaluate_matching_result(result):
-    """
-    Evaluate one matching result and return
-    potential review flags.
-
-    These flags are advisory indicators only.
-    They do not establish discrimination or
-    automatically affect hiring decisions.
-    """
-
-    flags = []
-
-    match_id = get_value(result, "match_id")
-    job_role_id = get_value(result, "job_role_id")
-
-    if not match_id or not job_role_id:
-        return flags
-
-    # ----------------------------------------------
-    # RULE 1: MISSING MANDATORY SKILLS
-    # ----------------------------------------------
-
-    missing_mandatory = normalize_skill_list(
-        get_value(result, "missing_mandatory_skills", [])
-    )
-
-    if missing_mandatory:
-
-        skill_names = ", ".join(missing_mandatory)
-
-        flags.append({
-            "match_id": match_id,
-            "job_role_id": job_role_id,
-            "flag_type": "missing_mandatory_skills",
-            "severity": "medium",
-            "description": (
-                "The employee is missing the following "
-                f"mandatory skills: {skill_names}. "
-                "This requires HR review to verify that "
-                "the requirements are genuinely necessary "
-                "and that the employee's experience has "
-                "been represented accurately."
-            ),
-            "recommendation": (
-                "Review the mandatory skill requirements, "
-                "the employee's confirmed skills, and "
-                "whether equivalent experience or "
-                "transferable skills should be considered."
-            )
-        })
-
-    # ----------------------------------------------
-    # RULE 2: EXPERIENCE OUTSIDE JOB RANGE
-    # ----------------------------------------------
-
-    experience_warning = get_value(
-        result,
-        "experience_warning"
-    )
-
-    if experience_warning:
-
-        flags.append({
-            "match_id": match_id,
-            "job_role_id": job_role_id,
-            "flag_type": "experience_out_of_range",
-            "severity": "medium",
-            "description": (
-                "The employee's experience is outside "
-                "the stated experience range for this role. "
-                f"Details: {experience_warning}"
-            ),
-            "recommendation": (
-                "Review whether the experience range is "
-                "a necessary requirement and whether "
-                "equivalent skills or relevant experience "
-                "justify further consideration."
-            )
-        })
-
-    # ----------------------------------------------
-    # RULE 3: LOW MATCH SCORE
-    # ----------------------------------------------
-
-    match_score = get_value(result, "match_score")
-
-    try:
-        match_score = float(match_score)
-    except (TypeError, ValueError):
-        match_score = None
-
-    if (
-        match_score is not None
-        and match_score < LOW_MATCH_SCORE_THRESHOLD
-    ):
-
-        flags.append({
-            "match_id": match_id,
-            "job_role_id": job_role_id,
-            "flag_type": "low_match_score",
-            "severity": "medium",
-            "description": (
-                f"The employee received a match score "
-                f"of {match_score:.2f}%, which is below "
-                f"the review threshold of "
-                f"{LOW_MATCH_SCORE_THRESHOLD:.0f}%."
-            ),
-            "recommendation": (
-                "Review the matching explanation, "
-                "required skill weights, and role criteria "
-                "to ensure that the scoring criteria "
-                "are appropriate and consistently applied."
-            )
-        })
-
-    return flags
-
-
-# --------------------------------------------------
-# GENERATE FLAGS FOR MATCHING RESULTS
-# --------------------------------------------------
-
-def generate_bias_flags_for_matching_results(results):
-    """
-    Called automatically after matching completes.
-
-    Evaluates every generated matching result,
-    then stores all detected flags.
-    """
-
-    all_flags = []
-
-    for result in results:
-
-        detected_flags = evaluate_matching_result(result)
-
-        all_flags.extend(detected_flags)
-
-    created_count = create_bias_audit_flags(all_flags)
+    if not row:
+        return None
 
     return {
-        "total_matches_evaluated": len(results),
-        "total_flags_detected": len(all_flags),
-        "total_new_flags_created": created_count
+        "flag_id": row.get("FLAG_ID") or row.get("flag_id"),
+        "job_role_id": row.get("JOB_ROLE_ID") or row.get("job_role_id"),
+        "match_id": row.get("MATCH_ID") or row.get("match_id"),
+        "flag_type": row.get("FLAG_TYPE") or row.get("flag_type"),
+        "severity": row.get("SEVERITY") or row.get("severity"),
+        "description": row.get("DESCRIPTION") or row.get("description"),
+        "recommendation": (
+            row.get("RECOMMENDATION")
+            if "RECOMMENDATION" in row
+            else row.get("recommendation")
+        ),
+        "review_status": (
+            row.get("REVIEW_STATUS") or row.get("review_status")
+        ),
+        "reviewed_by_hr": (
+            row.get("REVIEWED_BY_HR")
+            or row.get("reviewed_by_hr")
+        ),
+        "reviewed_at": (
+            row.get("REVIEWED_AT") or row.get("reviewed_at")
+        ),
+        "review_comments": (
+            row.get("REVIEW_COMMENTS")
+            if "REVIEW_COMMENTS" in row
+            else row.get("review_comments")
+        ),
+        "created_at": (
+            row.get("CREATED_AT") or row.get("created_at")
+        ),
+        "employee_id": (
+            row.get("EMPLOYEE_ID") or row.get("employee_id")
+        ),
+        "employee_name": (
+            row.get("EMPLOYEE_NAME") or row.get("employee_name")
+        ),
+        "job_title": (
+            row.get("JOB_TITLE") or row.get("job_title")
+        ),
+        "match_score": (
+            float(
+                row.get("MATCH_SCORE")
+                if row.get("MATCH_SCORE") is not None
+                else row.get("match_score")
+            )
+            if (
+                row.get("MATCH_SCORE") is not None
+                or row.get("match_score") is not None
+            )
+            else None
+        ),
     }
 
 
-# --------------------------------------------------
-# LIST BIAS AUDIT FLAGS
-# --------------------------------------------------
+def _normalize_decision(row):
+    """Normalize HR decision records returned by the model."""
 
-def list_bias_audit_flags(
+    if not row:
+        return None
+
+    return {
+        "decision_id": (
+            row.get("DECISION_ID")
+            or row.get("decision_id")
+        ),
+        "match_id": (
+            row.get("MATCH_ID")
+            or row.get("match_id")
+        ),
+        "hr_id": (
+            row.get("HR_ID")
+            or row.get("hr_id")
+        ),
+        "decision": (
+            row.get("DECISION")
+            or row.get("decision")
+        ),
+        "comments": (
+            row.get("COMMENTS")
+            if "COMMENTS" in row
+            else row.get("comments")
+        ),
+        "override_reason": (
+            row.get("OVERRIDE_REASON")
+            if "OVERRIDE_REASON" in row
+            else row.get("override_reason")
+        ),
+        "created_at": (
+            row.get("CREATED_AT")
+            or row.get("created_at")
+        ),
+    }
+
+
+# ---------------------------------------------------------------------
+# Run Bias Review Agent
+# ---------------------------------------------------------------------
+
+def run_bias_review(
+    employee_id=None,
+    match_ids=None,
+    job_role_ids=None,
+    actor="HR",
+):
+    """
+    Orchestrates the Bias Review workflow.
+
+    Responsibilities:
+        1. Fetch matching results and job-role criteria.
+        2. Invoke the Bias Review Agent.
+        3. Persist generated flags and audit events.
+        4. Return the audit summary.
+
+    All bias-detection logic belongs to the agent.
+    All database operations belong to the model.
+    """
+
+    # 1. Fetch inputs through the model.
+    matching_results, job_roles = get_bias_audit_inputs(
+        employee_id=employee_id,
+        match_ids=match_ids,
+        job_role_ids=job_role_ids,
+    )
+
+    if not matching_results and not job_roles:
+        raise ValueError(
+            "No matching results or job roles were found "
+            "for the requested bias review."
+        )
+
+    # 2. Execute the Bias Review Agent.
+    audit_result = run_bias_audit(
+        matching_results=matching_results,
+        job_roles=job_roles,
+    )
+
+    # 3. Persist flags and audit events.
+    # IMPORTANT: The model parameter is summary_text, not summary.
+    persistence_result = create_bias_audit_flags(
+        flags=audit_result["flags"],
+        actor=actor,
+        summary_text=audit_result["hr_summary_recommendation"],
+    )
+
+    # 4. Prepare the API response.
+    return {
+        "message": "Bias review completed successfully.",
+
+        "audit_status": audit_result["audit_status"],
+
+        "total_roles_audited": audit_result[
+            "total_roles_audited"
+        ],
+
+        "total_matches_audited": audit_result[
+            "total_matches_audited"
+        ],
+
+        "total_flags_raised": audit_result[
+            "total_flags_raised"
+        ],
+
+        "high_severity_count": audit_result[
+            "high_severity_count"
+        ],
+
+        "medium_severity_count": audit_result[
+            "medium_severity_count"
+        ],
+
+        "low_severity_count": audit_result[
+            "low_severity_count"
+        ],
+
+        "total_flags_inserted": persistence_result[
+            "total_flags_inserted"
+        ],
+
+        "total_existing_flags_skipped": persistence_result[
+            "total_existing_flags_skipped"
+        ],
+
+        "flags": audit_result["flags"],
+
+        "hr_summary_recommendation": audit_result[
+            "hr_summary_recommendation"
+        ],
+    }
+
+
+# ---------------------------------------------------------------------
+# Backward compatibility for existing callers
+# ---------------------------------------------------------------------
+
+def generate_bias_flags_for_matching_results(
+    results,
+    actor="HR",
+):
+    """
+    Compatibility wrapper for older matching-related callers.
+
+    New implementations should call run_bias_review().
+    """
+
+    results = results or []
+
+    match_ids = [
+        result.get("match_id") or result.get("MATCH_ID")
+        for result in results
+        if result.get("match_id") or result.get("MATCH_ID")
+    ]
+
+    if not match_ids:
+        raise ValueError(
+            "No valid match IDs were supplied for bias review."
+        )
+
+    return run_bias_review(
+        match_ids=match_ids,
+        actor=actor,
+    )
+
+
+# ---------------------------------------------------------------------
+# List Bias Audit Flags
+# ---------------------------------------------------------------------
+
+def get_bias_audit_flags(
     review_status=None,
     flag_type=None,
-    job_role_id=None
+    employee_id=None,
+    job_role_id=None,
 ):
-    if review_status:
-        review_status = review_status.strip().lower()
+    if review_status and review_status not in {
+        "pending",
+        "concerning",
+        "not_concerning",
+    }:
+        raise ValueError("Invalid bias review status.")
 
-        allowed_statuses = {
-            "pending",
-            "concerning",
-            "not_concerning"
-        }
-
-        if review_status not in allowed_statuses:
-            raise ValueError("Invalid review status.")
-
-    if flag_type:
-        flag_type = flag_type.strip()
-
-    results = get_bias_audit_flags(
+    rows = fetch_bias_audit_flags(
         review_status=review_status,
+        employee_id=employee_id,
+        job_role_id=job_role_id,
         flag_type=flag_type,
-        job_role_id=job_role_id
     )
+
+    flags = [
+        _normalize_flag(row)
+        for row in rows
+    ]
 
     return {
         "message": "Bias audit flags retrieved successfully.",
-        "total_flags": len(results),
-        "flags": results
+        "total_flags": len(flags),
+        "flags": flags,
     }
 
 
-# --------------------------------------------------
-# GET SINGLE BIAS AUDIT FLAG
-# --------------------------------------------------
+# Compatibility with existing routes.
+def list_bias_audit_flags(
+    review_status=None,
+    flag_type=None,
+    job_role_id=None,
+):
+    return get_bias_audit_flags(
+        review_status=review_status,
+        flag_type=flag_type,
+        job_role_id=job_role_id,
+    )
 
-def get_bias_audit_flag(flag_id):
-    flag = get_bias_audit_flag_by_id(flag_id)
 
-    if not flag:
+# ---------------------------------------------------------------------
+# Get Individual Bias Flag
+# ---------------------------------------------------------------------
+
+def get_bias_audit_flag_by_id(flag_id):
+    if not flag_id:
+        raise ValueError("A flag ID is required.")
+
+    row = fetch_bias_audit_flag_by_id(flag_id)
+
+    if not row:
         return None
 
     return {
         "message": "Bias audit flag retrieved successfully.",
-        "flag": flag
+        "flag": _normalize_flag(row),
     }
 
 
-# --------------------------------------------------
-# HR REVIEWS A BIAS FLAG
-# --------------------------------------------------
+def get_bias_audit_flag(flag_id):
+    return get_bias_audit_flag_by_id(flag_id)
+
+
+# ---------------------------------------------------------------------
+# Review Bias Flag
+# ---------------------------------------------------------------------
+
+def review_bias_audit_flag(
+    flag_id,
+    hr_id,
+    review_status,
+    review_comments=None,
+):
+    if not flag_id:
+        raise ValueError("A flag ID is required.")
+
+    if not hr_id:
+        raise ValueError("An HR ID is required.")
+
+    if review_status not in VALID_REVIEW_STATUSES:
+        raise ValueError(
+            "Review status must be 'concerning' or "
+            "'not_concerning'."
+        )
+
+    row = save_bias_audit_review(
+        flag_id=flag_id,
+        hr_id=hr_id,
+        review_status=review_status,
+        review_comments=review_comments,
+    )
+
+    if not row:
+        return None
+
+    return {
+        "message": "Bias audit flag reviewed successfully.",
+        "flag": _normalize_flag(row),
+    }
+
 
 def review_bias_flag(
     flag_id,
     hr_id,
     review_status,
-    review_comments=None
+    review_comments=None,
 ):
-    if not review_status:
-        raise ValueError("Review status is required.")
-
-    review_status = review_status.strip().lower()
-
-    if review_status not in VALID_REVIEW_STATUSES:
-        raise ValueError(
-            "Review status must be 'concerning' "
-            "or 'not_concerning'."
-        )
-
-    if review_comments is not None:
-        review_comments = review_comments.strip()
-
-        if not review_comments:
-            review_comments = None
-
-    result = review_bias_audit_flag(
+    return review_bias_audit_flag(
         flag_id=flag_id,
         hr_id=hr_id,
         review_status=review_status,
-        review_comments=review_comments
+        review_comments=review_comments,
     )
 
-    if not result:
-        return None
 
-    return {
-        "message": "Bias audit flag reviewed successfully.",
-        "flag": result
-    }
+# ---------------------------------------------------------------------
+# Record HR Matching Decision
+# ---------------------------------------------------------------------
 
+def create_hr_match_decision(
+    match_id,
+    hr_id,
+    decision,
+    comments=None,
+    override_reason=None,
+):
+    if not match_id:
+        raise ValueError("A match ID is required.")
 
-# --------------------------------------------------
-# RECORD HR MATCHING DECISION
-# --------------------------------------------------
+    if not hr_id:
+        raise ValueError("An HR ID is required.")
+
+    if decision not in VALID_MATCH_DECISIONS:
+        raise ValueError(
+            "Invalid HR decision. Choose one of: "
+            + ", ".join(sorted(VALID_MATCH_DECISIONS))
+        )
+
+    if decision == "reject" and not (
+        (comments and comments.strip())
+        or (override_reason and override_reason.strip())
+    ):
+        raise ValueError(
+            "Please provide comments or an override reason "
+            "when rejecting a match."
+        )
+
+    row = save_hr_match_decision(
+        match_id=match_id,
+        hr_id=hr_id,
+        decision=decision,
+        comments=comments,
+        override_reason=override_reason,
+    )
+
+    return _normalize_decision(row)
+
 
 def record_hr_matching_decision(
     match_id,
     hr_id,
     decision,
     comments=None,
-    override_reason=None
+    override_reason=None,
 ):
-    if not decision:
-        raise ValueError("HR decision is required.")
-
-    decision = decision.strip().lower()
-
-    if decision not in VALID_MATCH_DECISIONS:
-        raise ValueError(
-            "Decision must be one of: "
-            "shortlist, reject, hold, needs_further_review."
-        )
-
-    if comments is not None:
-        comments = comments.strip() or None
-
-    if override_reason is not None:
-        override_reason = override_reason.strip() or None
-
-    if decision == "reject" and not override_reason:
-        raise ValueError(
-            "An override reason is required when rejecting "
-            "a matching result."
-        )
-
-    result = create_hr_match_decision(
+    return create_hr_match_decision(
         match_id=match_id,
         hr_id=hr_id,
         decision=decision,
         comments=comments,
-        override_reason=override_reason
+        override_reason=override_reason,
     )
 
-    if not result:
-        return None
 
-    return {
-        "message": "HR matching decision recorded successfully.",
-        "decision": result
-    }
+# ---------------------------------------------------------------------
+# List HR Matching Decisions
+# ---------------------------------------------------------------------
 
+def get_hr_match_decisions(match_id=None):
+    rows = fetch_hr_match_decisions(
+        match_id=match_id,
+    )
 
-# --------------------------------------------------
-# GET HR DECISIONS FOR A MATCH
-# --------------------------------------------------
-
-def list_hr_matching_decisions(match_id):
-    decisions = get_hr_match_decisions(match_id)
+    decisions = [
+        _normalize_decision(row)
+        for row in rows
+    ]
 
     return {
         "message": "HR matching decisions retrieved successfully.",
         "total_decisions": len(decisions),
-        "decisions": decisions
+        "decisions": decisions,
     }
+
+
+def list_hr_matching_decisions(match_id):
+    return get_hr_match_decisions(
+        match_id=match_id,
+    )
