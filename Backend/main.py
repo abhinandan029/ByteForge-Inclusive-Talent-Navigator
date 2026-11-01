@@ -2,6 +2,7 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
+from fastapi.openapi.utils import get_openapi
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database.connection import (
@@ -13,6 +14,7 @@ from app.database.connection import (
 
 from app.routes.auth_routes import router as auth_router
 from app.routes.hr_routes import router as hr_router
+from app.routes.document_routes import router as document_router
 from app.routes.hr_job_routes import router as hr_job_router
 from app.routes.skills_routes import router as skills_router
 from app.routes.matching_routes import router as matching_router
@@ -67,6 +69,36 @@ app.add_middleware(
 )
 
 
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+    )
+
+    schemas = openapi_schema.get("components", {}).get("schemas", {})
+
+    for schema in schemas.values():
+        properties = schema.get("properties", {})
+        files_property = properties.get("files")
+
+        if files_property and files_property.get("type") == "array":
+            items = files_property.get("items", {})
+
+            if items.get("contentMediaType"):
+                items.pop("contentMediaType")
+                items["format"] = "binary"
+
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+
+app.openapi = custom_openapi    
+
 # ==================================================
 # ROUTER REGISTRATION
 # ==================================================
@@ -75,6 +107,8 @@ app.include_router(auth_router)
 
 app.include_router(hr_router)
 app.include_router(hr_job_router)
+
+app.include_router(document_router)
 
 app.include_router(skills_router)
 

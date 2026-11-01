@@ -9,8 +9,6 @@ from typing import Optional
 
 class ProfileExtractRequest(BaseModel):
     employee_id: str
-    profile_text: str
-
 
 class SkillItem(BaseModel):
     skill_id: str

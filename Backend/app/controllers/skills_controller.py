@@ -17,6 +17,7 @@ from app.models.skills_model import (
     save_confirmed_skills,
     get_employee_skills,
     get_audit_logs,
+    get_employee_profile_text,
 )
 
 
@@ -46,7 +47,6 @@ skills_agent = SkillsDiscoveryAgent(
 
 async def extract_skills_controller(payload):
     employee_id = payload.employee_id
-    profile_text = payload.profile_text
 
     if not employee_id:
         raise HTTPException(
@@ -54,13 +54,13 @@ async def extract_skills_controller(payload):
             detail="Employee ID is required."
         )
 
-    if not profile_text or not profile_text.strip():
-        raise HTTPException(
-            status_code=400,
-            detail="Employee profile text is empty."
-        )
-
     try:
+        # Fetch profile text from the database.
+        profile_text = await run_in_threadpool(
+            get_employee_profile_text,
+            employee_id
+        )
+        
         agent_result = await skills_agent.discover_skills(
             employee_id=employee_id,
             profile_text=profile_text.strip()

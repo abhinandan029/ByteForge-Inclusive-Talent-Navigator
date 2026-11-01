@@ -102,6 +102,41 @@ def _get_confirmed_skill_names(cursor, employee_id):
     }
 
 
+def get_employee_profile_text(employee_id):
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT PROFILE_TEXT
+            FROM EMPLOYEES
+            WHERE EMPLOYEE_ID = ?
+            """,
+            (employee_id,)
+        )
+
+        row = cursor.fetchone()
+
+        if row is None:
+            raise ValueError("Employee not found.")
+
+        profile_text = row[0]
+
+        if not profile_text or not profile_text.strip():
+            raise ValueError(
+                "No profile text found. Please upload your documents first."
+            )
+
+        return profile_text.strip()
+
+    finally:
+        _close_resources(cursor, conn)
+
+
 # ==================================================
 # SAVE EXTRACTED SKILLS
 # ==================================================
