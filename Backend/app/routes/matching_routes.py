@@ -1,9 +1,11 @@
 
+import logging
+
 from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
-    status
+    status,
 )
 
 from app.utils.hr_auth_dependencies import get_current_hr
@@ -11,40 +13,63 @@ from app.utils.hr_auth_dependencies import get_current_hr
 from app.controllers.matching_controller import (
     run_internal_matching,
     get_matching_results,
-    get_matching_details
+    get_matching_details,
 )
 
-from app.schemas.matching_schema import RunMatchingRequest
+from app.schemas.matching_schema import (
+    RunMatchingRequest,
+    RunMatchingResponse,
+    MatchingResultsResponse,
+    MatchingDetailResponse,
+)
 
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/api/hr/matching",
-    tags=["HR Internal Talent Discovery"]
+    tags=["HR Internal Talent Discovery"],
 )
 
 
-# ==========================================
-# RUN INTERNAL MATCHING
-# ==========================================
+# ---------------------------------------------------------------------
+# Helper
+# ---------------------------------------------------------------------
 
-@router.post("/run")
+def _get_hr_actor(hr):
+    """Extract the HR identifier for the audit record."""
+    if isinstance(hr, dict):
+        return (
+            hr.get("HR_ID")
+            or hr.get("hr_id")
+            or "HR"
+        )
+
+    return (
+        getattr(hr, "HR_ID", None)
+        or getattr(hr, "hr_id", None)
+        or "HR"
+    )
+
+
+# ---------------------------------------------------------------------
+# Run Opportunity Matching
+# ---------------------------------------------------------------------
+
+@router.post(
+    "/run",
+    response_model=RunMatchingResponse,
+    status_code=status.HTTP_200_OK,
+)
 def run_matching(
     payload: RunMatchingRequest,
-    hr: dict = Depends(get_current_hr)
+    hr=Depends(get_current_hr),
 ):
-    """
-    Run matching between eligible employees
-    and active job roles.
-
-    Optional filters:
-    - employee_ids
-    - job_role_ids
-    """
-
     try:
         result = run_internal_matching(
             employee_ids=payload.employee_ids,
-            job_role_ids=payload.job_role_ids
+            job_role_ids=payload.job_role_ids,
+            actor=_get_hr_actor(hr),
         )
 
         return result
@@ -52,79 +77,86 @@ def run_matching(
     except ValueError as error:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(error)
-        )
-
-    except Exception as error:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An error occurred while running internal matching."
-        )
-
-
-# ==========================================
-# GET ALL MATCHING RESULTS
-# ==========================================
-
-@router.get("/results")
-def get_all_matching_results(
-    employee_id: str | None = None,
-    job_role_id: str | None = None,
-    hr: dict = Depends(get_current_hr)
-):
-    """
-    Retrieve matching results.
-
-    Optional query parameters:
-    - employee_id
-    - job_role_id
-    """
-
-    try:
-        return get_matching_results(
-            employee_id=employee_id,
-            job_role_id=job_role_id
+            detail=str(error),
         )
 
     except Exception:
+        logger.exception(
+            "Opportunity matching failed."
+        )
+
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unable to retrieve matching results."
+            detail="Opportunity matching failed. Please try again.",
         )
 
 
-# ==========================================
-# GET ONE MATCHING RESULT
-# ==========================================
+# ---------------------------------------------------------------------
+# Get matching results
+# ---------------------------------------------------------------------
 
-@router.get("/results/{match_id}")
+@router.get(
+    "/results",
+    response_model=MatchingResultsResponse,
+)
+def get_all_matching_results(
+    employee_id: str | None = None,
+    job_role_id: str | None = None,
+    hr=Depends(get_current_hr),
+):
+    try:
+        return get_matching_results(
+            employee_id=employee_id,
+            job_role_id=job_role_id,
+        )
+
+    except Exception:
+        logger.exception(
+            "Failed to retrieve matching results."
+        )
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not retrieve matching results.",
+        )
+
+
+# ---------------------------------------------------------------------
+# Get one matching result
+# ---------------------------------------------------------------------
+
+@router.get(
+    "/results/{match_id}",
+    response_model=MatchingDetailResponse,
+)
 def get_one_matching_result(
     match_id: str,
-    hr: dict = Depends(get_current_hr)
+    hr=Depends(get_current_hr),
 ):
-    """
-    Retrieve one matching result using MATCH_ID.
-    """
-
     try:
         result = get_matching_details(match_id)
 
         if not result:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Matching result not found."
+                detail="Matching result not found.",
             )
 
         return {
-            "message": "Matching result retrieved successfully",
-            "result": result
+            "message": "Matching result retrieved successfully.",
+            "result": result,
         }
 
     except HTTPException:
         raise
 
     except Exception:
+        logger.exception(
+            "Failed to retrieve matching result %s.",
+            match_id,
+        )
+
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unable to retrieve matching result."
+            detail="Could not retrieve the matching result.",
         )

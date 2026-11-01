@@ -1,46 +1,39 @@
 
 from typing import Optional
+
 from pydantic import BaseModel, Field
 
 
-# ==========================================
-# MATCHING REQUEST SCHEMAS
-# ==========================================
+# ---------------------------------------------------------------------
+# Requests
+# ---------------------------------------------------------------------
 
 class RunMatchingRequest(BaseModel):
-    """
-    Optional filters:
-    - employee_ids: Run matching for selected eligible employees.
-    - job_role_ids: Run matching against selected active job roles.
-
-    If omitted, all eligible employees and active job roles are considered.
-    """
-
     employee_ids: Optional[list[str]] = None
     job_role_ids: Optional[list[str]] = None
 
 
-# ==========================================
-# MATCH DETAIL SCHEMAS
-# ==========================================
+# ---------------------------------------------------------------------
+# Skill details
+# ---------------------------------------------------------------------
 
 class MatchedSkill(BaseModel):
     skill_name: str
     taxonomy_category: Optional[str] = None
-    weight: float
+    weight: float = 1.0
 
 
 class MissingSkill(BaseModel):
     skill_name: str
     taxonomy_category: Optional[str] = None
     required_proficiency: Optional[str] = None
-    is_mandatory: bool
-    weight: float
+    is_mandatory: bool = True
+    weight: float = 1.0
 
 
-# ==========================================
-# INDIVIDUAL MATCH RESULT
-# ==========================================
+# ---------------------------------------------------------------------
+# Matching result
+# ---------------------------------------------------------------------
 
 class MatchingResultItem(BaseModel):
     match_id: str
@@ -55,30 +48,54 @@ class MatchingResultItem(BaseModel):
     department: Optional[str] = None
 
     match_score: float
-    match_status: str
+    match_status: str = "completed"
 
-    matched_skills: list[MatchedSkill] = Field(default_factory=list)
-    missing_skills: list[MissingSkill] = Field(default_factory=list)
+    matched_skills: list[MatchedSkill] = Field(
+        default_factory=list
+    )
 
-    missing_mandatory_skills: list[str] = Field(default_factory=list)
+    missing_skills: list[MissingSkill] = Field(
+        default_factory=list
+    )
+
+    missing_mandatory_skills: list[str] = Field(
+        default_factory=list
+    )
+
     experience_warning: Optional[str] = None
-
     match_explanation: Optional[str] = None
 
 
-# ==========================================
-# MATCHING API RESPONSE SCHEMAS
-# ==========================================
+# ---------------------------------------------------------------------
+# Run matching response
+# ---------------------------------------------------------------------
 
 class RunMatchingResponse(BaseModel):
     message: str
+
     total_employees_processed: int
     total_job_roles_processed: int
     total_matches_generated: int
-    results: list[MatchingResultItem] = Field(default_factory=list)
+    total_matches_saved: int
 
+    results: list[MatchingResultItem] = Field(
+        default_factory=list
+    )
+
+
+# ---------------------------------------------------------------------
+# Retrieve matching results
+# ---------------------------------------------------------------------
 
 class MatchingResultsResponse(BaseModel):
     message: str
     total_results: int
-    results: list[MatchingResultItem] = Field(default_factory=list)
+
+    results: list[MatchingResultItem] = Field(
+        default_factory=list
+    )
+
+
+class MatchingDetailResponse(BaseModel):
+    message: str
+    result: MatchingResultItem

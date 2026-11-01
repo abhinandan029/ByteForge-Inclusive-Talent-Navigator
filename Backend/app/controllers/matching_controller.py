@@ -1,5 +1,5 @@
 
-from decimal import Decimal, InvalidOperation
+from agents.matching_agent import run_inclusive_matching
 
 from app.models.matching_model import (
     get_matching_employees,
@@ -8,534 +8,165 @@ from app.models.matching_model import (
     get_confirmed_employee_skills,
     save_matching_results,
     get_all_matching_results,
-    get_matching_result_by_id
-)
-
-from app.controllers.bias_audit_controller import (
-    generate_bias_flags_for_matching_results
+    get_matching_result_by_id,
 )
 
 
-# ==========================================
-# HELPER FUNCTIONS
-# ==========================================
-
-def normalize_skill_name(skill_name):
-    """
-    Normalize skill names for case-insensitive comparison.
-    """
-
-    if not skill_name:
-        return ""
-
-    return str(skill_name).strip().casefold()
-
-
-def convert_to_float(value, default=0.0):
-    """
-    Safely convert database numeric values to float.
-    """
-
-    if value is None:
-        return default
-
-    try:
-        return float(value)
-    except (ValueError, TypeError, InvalidOperation):
-        return default
-
-
-def convert_to_bool(value):
-    """
-    Convert database TINYINT values to boolean.
-    """
-
-    return bool(value)
-
-
-# ==========================================
-# EXPERIENCE VALIDATION
-# ==========================================
-
-def get_experience_warning(employee, job_role):
-    """
-    Experience is a recommendation criterion,
-    not an automatic exclusion criterion.
-    """
-
-    years = employee.get("years_experience")
-
-    minimum = job_role.get("experience_min")
-    maximum = job_role.get("experience_max")
-
-    if years is None:
-        return "Employee experience information is unavailable."
-
-    years = convert_to_float(years)
-
-    minimum = (
-        convert_to_float(minimum)
-        if minimum is not None else None
-    )
-
-    maximum = (
-        convert_to_float(maximum)
-        if maximum is not None else None
-    )
-
-    if minimum is not None and years < minimum:
-        return (
-            f"Employee has {years:g} years of experience, "
-            f"below the preferred minimum of {minimum:g} years."
-        )
-
-    if maximum is not None and years > maximum:
-        return (
-            f"Employee has {years:g} years of experience, "
-            f"above the preferred maximum of {maximum:g} years."
-        )
-
-    return None
-
-
-# ==========================================
-# MATCHING SCORE CALCULATION
-# ==========================================
-
-def calculate_skill_match(
-    employee_skills,
-    required_skills
-):
-    """
-    Compare confirmed employee skills with
-    job role requirements.
-
-    Score formula:
-
-        Matched requirement weights
-        ---------------------------  x 100
-        Total requirement weights
-
-    Employee proficiency is not assumed because
-    the confirmed skills table does not store it.
-    """
-
-    employee_skill_lookup = {}
-
-    for skill in employee_skills:
-
-        normalized_name = normalize_skill_name(
-            skill.get("name")
-        )
-
-        if normalized_name:
-            employee_skill_lookup[normalized_name] = skill
-
-    matched_skills = []
-    missing_skills = []
-
-    total_weight = 0.0
-    matched_weight = 0.0
-
-    for requirement in required_skills:
-
-        skill_name = requirement.get("skill_name", "")
-
-        normalized_name = normalize_skill_name(
-            skill_name
-        )
-
-        weight = convert_to_float(
-            requirement.get("weight"),
-            1.0
-        )
-
-        if weight < 0:
-            raise ValueError(
-                f"Invalid weight for skill '{skill_name}'. "
-                "Skill weights cannot be negative."
-            )
-
-        total_weight += weight
-
-        employee_skill = employee_skill_lookup.get(
-            normalized_name
-        )
-
-        if employee_skill:
-
-            matched_weight += weight
-
-            matched_skills.append({
-                "skill_name": skill_name,
-                "taxonomy_category": (
-                    employee_skill.get("taxonomy_category")
-                    or requirement.get("taxonomy_category")
-                ),
-                "weight": weight
-            })
-
-        else:
-
-            missing_skills.append({
-                "skill_name": skill_name,
-                "taxonomy_category": (
-                    requirement.get("taxonomy_category")
-                ),
-                "required_proficiency": (
-                    requirement.get("required_proficiency")
-                ),
-                "is_mandatory": convert_to_bool(
-                    requirement.get("is_mandatory", 1)
-                ),
-                "weight": weight
-            })
-
-    if total_weight > 0:
-        match_score = (
-            matched_weight / total_weight
-        ) * 100
-    else:
-        match_score = 0.0
-
-    match_score = round(match_score, 2)
-
-    missing_mandatory_skills = [
-        skill["skill_name"]
-        for skill in missing_skills
-        if skill["is_mandatory"]
-    ]
-
-    return {
-        "match_score": match_score,
-        "matched_skills": matched_skills,
-        "missing_skills": missing_skills,
-        "missing_mandatory_skills": (
-            missing_mandatory_skills
-        ),
-        "total_required_skills": len(required_skills),
-        "total_matched_skills": len(matched_skills)
-    }
-
-
-# ==========================================
-# MATCH EXPLANATION
-# ==========================================
-
-def generate_match_explanation(
-    employee,
-    job_role,
-    match_data,
-    experience_warning
-):
-    """
-    Generate a readable explanation of the result.
-    """
-
-    score = match_data["match_score"]
-
-    matched = match_data["matched_skills"]
-    missing = match_data["missing_skills"]
-
-    missing_mandatory = (
-        match_data["missing_mandatory_skills"]
-    )
-
-    if not match_data["total_required_skills"]:
-        explanation = (
-            "No skill requirements have been configured "
-            "for this job role. A meaningful skill match "
-            "score cannot be calculated."
-        )
-
-    else:
-        explanation = (
-            f"Employee matches {len(matched)} out of "
-            f"{len(matched) + len(missing)} required skills "
-            f"for the {job_role['title']} role. "
-            f"The weighted skill match score is {score:.2f}%."
-        )
-
-    if missing_mandatory:
-        explanation += (
-            " Missing mandatory skills: "
-            + ", ".join(missing_mandatory)
-            + "."
-        )
-    else:
-        explanation += (
-            " All mandatory skills are matched."
-        )
-
-    if experience_warning:
-        explanation += (
-            " Experience warning: "
-            + experience_warning
-        )
-
-    return explanation
-
-
-# ==========================================
-# RUN INTERNAL TALENT MATCHING
-# ==========================================
+# ---------------------------------------------------------------------
+# Run Opportunity Matching
+# ---------------------------------------------------------------------
 
 def run_internal_matching(
     employee_ids=None,
-    job_role_ids=None
+    job_role_ids=None,
+    actor="HR",
 ):
     """
-    Run matching for eligible employees
-    against active job roles.
+    Orchestrates the Opportunity Matching workflow.
 
-    Only confirmed employee skills are used.
+    Controller responsibilities:
+        1. Fetch eligible employees.
+        2. Fetch active job roles.
+        3. Fetch job requirements and confirmed employee skills.
+        4. Invoke the matching agent.
+        5. Save generated results and audit events.
+        6. Retrieve persisted results for the response.
 
-    Workflow:
-    1. Fetch eligible employees and active roles.
-    2. Calculate employee-role matching scores.
-    3. Save or update matching results.
-    4. Automatically generate bias-audit flags.
-    5. Return matching and audit statistics.
-
-    Bias flags are advisory signals only.
-    They do not automatically reject employees
-    or modify matching scores.
+    All matching business logic lives in matching_agent.py.
     """
 
-    # --------------------------------------
-    # 1. Fetch eligible employees
-    # --------------------------------------
-
-    employees = get_matching_employees(
-        employee_ids
-    )
+    # 1. Fetch eligible employees.
+    employees = get_matching_employees(employee_ids)
 
     if not employees:
-        return {
-            "message": (
-                "No employees are currently ready "
-                "for matching."
-            ),
-            "total_employees_processed": 0,
-            "total_job_roles_processed": 0,
-            "total_matches_generated": 0,
-            "bias_audit": {
-                "total_matches_evaluated": 0,
-                "total_flags_detected": 0,
-                "total_new_flags_created": 0
-            },
-            "results": []
-        }
+        raise ValueError(
+            "No eligible employees found. Employees must have "
+            "confirmed skills and be ready for matching."
+        )
 
-    # --------------------------------------
-    # 2. Fetch active job roles
-    # --------------------------------------
-
-    job_roles = get_matching_job_roles(
-        job_role_ids
-    )
+    # 2. Fetch active job roles.
+    job_roles = get_matching_job_roles(job_role_ids)
 
     if not job_roles:
-        return {
-            "message": (
-                "No active job roles were found "
-                "for matching."
-            ),
-            "total_employees_processed": len(employees),
-            "total_job_roles_processed": 0,
-            "total_matches_generated": 0,
-            "bias_audit": {
-                "total_matches_evaluated": 0,
-                "total_flags_detected": 0,
-                "total_new_flags_created": 0
-            },
-            "results": []
-        }
+        raise ValueError(
+            "No active job roles found for matching."
+        )
 
-    # --------------------------------------
-    # 3. Fetch job requirements
-    # --------------------------------------
-
-    role_ids = [
-        role["job_role_id"]
-        for role in job_roles
-    ]
-
-    job_requirements = get_job_required_skills(
-        role_ids
-    )
-
-    # --------------------------------------
-    # 4. Fetch confirmed employee skills
-    # --------------------------------------
-
-    employee_id_list = [
-        employee["employee_id"]
+    # 3. Extract IDs required for the remaining database queries.
+    eligible_employee_ids = [
+        employee["EMPLOYEE_ID"]
         for employee in employees
     ]
 
+    active_job_role_ids = [
+        role["JOB_ROLE_ID"]
+        for role in job_roles
+    ]
+
+    # 4. Fetch the data required by the agent.
+    job_requirements = get_job_required_skills(
+        active_job_role_ids
+    )
+
     employee_skills = get_confirmed_employee_skills(
-        employee_id_list
+        eligible_employee_ids
     )
 
-    # --------------------------------------
-    # 5. Calculate employee-role matches
-    # --------------------------------------
+    # 5. Invoke the Opportunity Matching Agent.
+    matching_results = run_inclusive_matching(
+        employees=employees,
+        job_roles=job_roles,
+        job_requirements=job_requirements,
+        employee_skills=employee_skills,
+    )
 
-    results = []
+    # 6. Save results and central audit events.
+    saved_count = save_matching_results(
+        matching_results,
+        actor=actor,
+    )
 
-    for employee in employees:
+    # 7. Retrieve persisted results for the selected employees/roles.
+    employee_filter = set(
+        str(employee_id)
+        for employee_id in eligible_employee_ids
+    )
 
-        employee_id = employee["employee_id"]
+    role_filter = set(
+        str(role_id)
+        for role_id in active_job_role_ids
+    )
 
-        confirmed_skills = employee_skills.get(
-            employee_id,
-            []
+    stored_results = get_all_matching_results(
+        employee_ids=eligible_employee_ids,
+        job_role_ids=active_job_role_ids,
+    )
+
+    # Restrict the response to the employee-role combinations
+    # processed in this run.
+    processed_pairs = {
+        (
+            str(result["employee_id"]),
+            str(result["job_role_id"]),
         )
+        for result in matching_results
+    }
 
-        for job_role in job_roles:
+    response_results = [
+        result
+        for result in stored_results
+        if (
+            str(result["employee_id"]),
+            str(result["job_role_id"]),
+        ) in processed_pairs
+    ]
 
-            job_role_id = job_role["job_role_id"]
-
-            required_skills = job_requirements.get(
-                job_role_id,
-                []
-            )
-
-            match_data = calculate_skill_match(
-                confirmed_skills,
-                required_skills
-            )
-
-            experience_warning = get_experience_warning(
-                employee,
-                job_role
-            )
-
-            explanation = generate_match_explanation(
-                employee,
-                job_role,
-                match_data,
-                experience_warning
-            )
-
-            result = {
-                "employee_id": employee_id,
-                "employee_name": employee.get("full_name"),
-                "current_role": employee.get("current_role"),
-                "years_experience": employee.get(
-                    "years_experience"
-                ),
-
-                "job_role_id": job_role_id,
-                "job_title": job_role["title"],
-                "department": job_role.get("department"),
-
-                "match_score": match_data["match_score"],
-                "match_status": "completed",
-
-                "matched_skills": match_data["matched_skills"],
-                "missing_skills": match_data["missing_skills"],
-
-                "missing_mandatory_skills": (
-                    match_data["missing_mandatory_skills"]
-                ),
-
-                "experience_warning": experience_warning,
-                "match_explanation": explanation
-            }
-
-            results.append(result)
-
-    # --------------------------------------
-    # 6. Save matching results
-    # --------------------------------------
-
-    saved_count = save_matching_results(results)
-
-    # save_matching_results adds match_id to
-    # every result dictionary before returning.
-
-    # --------------------------------------
-    # 7. Automatically generate bias flags
-    # --------------------------------------
-
-    bias_audit_summary = (
-        generate_bias_flags_for_matching_results(
-            results
+    response_results.sort(
+        key=lambda result: (
+            str(result["employee_id"]),
+            -float(result["match_score"]),
+            str(result["job_role_id"]),
         )
     )
-
-    # This evaluates all generated matching results.
-    # Existing flags are not duplicated by the model.
-    # Existing HR reviews remain unchanged.
-
-    # --------------------------------------
-    # 8. Sort results by matching score
-    # --------------------------------------
-
-    results.sort(
-        key=lambda item: item["match_score"],
-        reverse=True
-    )
-
-    # --------------------------------------
-    # 9. Return matching and audit results
-    # --------------------------------------
 
     return {
-        "message": (
-            "Internal talent matching and automatic "
-            "bias audit completed successfully."
-        ),
+        "message": "Opportunity matching completed successfully.",
 
         "total_employees_processed": len(employees),
 
         "total_job_roles_processed": len(job_roles),
 
-        "total_matches_generated": len(results),
+        "total_matches_generated": len(matching_results),
 
         "total_matches_saved": saved_count,
 
-        "bias_audit": bias_audit_summary,
-
-        "results": results
+        "results": response_results,
     }
 
 
-# ==========================================
-# GET MATCHING RESULTS
-# ==========================================
+# ---------------------------------------------------------------------
+# Get all matching results
+# ---------------------------------------------------------------------
 
 def get_matching_results(
     employee_id=None,
-    job_role_id=None
+    job_role_id=None,
 ):
-    """
-    Retrieve matching results with optional filters.
-    """
-
     results = get_all_matching_results(
-        employee_id,
-        job_role_id
+        employee_id=employee_id,
+        job_role_id=job_role_id,
     )
 
     return {
-        "message": "Matching results retrieved successfully",
+        "message": "Matching results retrieved successfully.",
         "total_results": len(results),
-        "results": results
+        "results": results,
     }
 
 
-# ==========================================
-# GET MATCH BY ID
-# ==========================================
+# ---------------------------------------------------------------------
+# Get one matching result
+# ---------------------------------------------------------------------
 
 def get_matching_details(match_id):
-    """
-    Retrieve one matching result.
-    """
-
-    return get_matching_result_by_id(
-        match_id
-    )
+    return get_matching_result_by_id(match_id)

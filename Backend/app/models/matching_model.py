@@ -2,23 +2,31 @@
 import json
 import uuid
 
-from app.database.connection import (
-    get_connection,
-    release_connection
-)
+from collections import defaultdict
+
+from app.database.connection import get_connection
 
 
-# ==========================================
-# HELPERS
-# ==========================================
+# ---------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------
 
-def generate_match_id():
-    return f"MATCH-{uuid.uuid4().hex}"
+def _new_match_id():
+    return f"MATCH_{uuid.uuid4().hex[:20].upper()}"
 
 
-def rows_to_dict(cursor, rows):
+def _rows_as_dicts(cursor):
+    """Convert database rows into dictionaries."""
+    rows = cursor.fetchall()
+
+    if not rows:
+        return []
+
+    if isinstance(rows[0], dict):
+        return rows
+
     columns = [
-        column[0].lower()
+        column[0]
         for column in cursor.description
     ]
 
@@ -28,34 +36,48 @@ def rows_to_dict(cursor, rows):
     ]
 
 
-def build_in_clause(values):
-    """
-    Creates a parameterized IN clause.
+def _decode_json(value, default):
+    if value is None:
+        return default
 
-    Example:
-        ["EMP001", "EMP002"] -> (?, ?)
-    """
-    return ", ".join(["?"] * len(values))
-
-
-# ==========================================
-# FETCH ELIGIBLE EMPLOYEES
-# ==========================================
-
-def get_matching_employees(employee_ids=None):
-    """
-    Fetch only employees who are ready for matching.
-
-    Draft or unconfirmed employees are excluded.
-    """
-
-    conn = None
-    cursor = None
+    if isinstance(value, (list, dict)):
+        return value
 
     try:
-        conn = get_connection()
-        cursor = conn.cursor()
+        return json.loads(value)
 
+    except (TypeError, ValueError):
+        return default
+
+
+def _close(cursor, connection):
+    try:
+        if cursor:
+            cursor.close()
+
+    finally:
+        if connection:
+            connection.close()
+
+
+def _build_in_clause(values):
+    values = list(values)
+
+    if not values:
+        return None, []
+
+    return ", ".join(["?"] * len(values)), values
+
+
+# ---------------------------------------------------------------------
+# Fetch eligible employees
+# ---------------------------------------------------------------------
+
+def get_matching_employees(employee_ids=None):
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    try:
         query = """
             SELECT
                 EMPLOYEE_ID,
@@ -64,9 +86,11 @@ def get_matching_employees(employee_ids=None):
                 GRADE,
                 YEARS_EXPERIENCE,
                 HAS_CAREER_BREAK,
+                IS_CONFIRMED,
                 READY_FOR_MATCHING
             FROM EMPLOYEES
             WHERE READY_FOR_MATCHING = 1
+              AND IS_CONFIRMED = 1
         """
 
         params = []
@@ -75,48 +99,31 @@ def get_matching_employees(employee_ids=None):
             if not employee_ids:
                 return []
 
-            query += (
-                f" AND EMPLOYEE_ID IN "
-                f"({build_in_clause(employee_ids)})"
+            placeholders, params = _build_in_clause(
+                employee_ids
             )
 
-            params.extend(employee_ids)
+            query += (
+                f" AND EMPLOYEE_ID IN ({placeholders})"
+            )
 
-        query += " ORDER BY FULL_NAME"
+        cursor.execute(query, params)
 
-        cursor.execute(query, tuple(params))
-
-        return rows_to_dict(
-            cursor,
-            cursor.fetchall()
-        )
+        return _rows_as_dicts(cursor)
 
     finally:
-        if cursor:
-            cursor.close()
-
-        if conn:
-            release_connection(conn)
+        _close(cursor, connection)
 
 
-# ==========================================
-# FETCH ACTIVE JOB ROLES
-# ==========================================
+# ---------------------------------------------------------------------
+# Fetch active job roles
+# ---------------------------------------------------------------------
 
 def get_matching_job_roles(job_role_ids=None):
-    """
-    Fetch active job roles.
-
-    Optionally filters by selected job role IDs.
-    """
-
-    conn = None
-    cursor = None
+    connection = get_connection()
+    cursor = connection.cursor()
 
     try:
-        conn = get_connection()
-        cursor = conn.cursor()
-
         query = """
             SELECT
                 JOB_ROLE_ID,
@@ -136,48 +143,39 @@ def get_matching_job_roles(job_role_ids=None):
             if not job_role_ids:
                 return []
 
-            query += (
-                f" AND JOB_ROLE_ID IN "
-                f"({build_in_clause(job_role_ids)})"
+            placeholders, params = _build_in_clause(
+                job_role_ids
             )
 
-            params.extend(job_role_ids)
+            query += (
+                f" AND JOB_ROLE_ID IN ({placeholders})"
+            )
 
         query += " ORDER BY TITLE"
 
-        cursor.execute(query, tuple(params))
+        cursor.execute(query, params)
 
-        return rows_to_dict(
-            cursor,
-            cursor.fetchall()
-        )
+        return _rows_as_dicts(cursor)
 
     finally:
-        if cursor:
-            cursor.close()
-
-        if conn:
-            release_connection(conn)
+        _close(cursor, connection)
 
 
-# ==========================================
-# FETCH JOB REQUIRED SKILLS
-# ==========================================
+# ---------------------------------------------------------------------
+# Fetch job requirements
+# ---------------------------------------------------------------------
 
 def get_job_required_skills(job_role_ids):
-    """
-    Fetch skill requirements for selected job roles.
-    """
-
     if not job_role_ids:
         return {}
 
-    conn = None
-    cursor = None
+    connection = get_connection()
+    cursor = connection.cursor()
 
     try:
-        conn = get_connection()
-        cursor = conn.cursor()
+        placeholders, params = _build_in_clause(
+            job_role_ids
+        )
 
         query = f"""
             SELECT
@@ -189,60 +187,40 @@ def get_job_required_skills(job_role_ids):
                 IS_MANDATORY,
                 WEIGHT
             FROM JOB_REQUIRED_SKILLS
-            WHERE JOB_ROLE_ID IN (
-                {build_in_clause(job_role_ids)}
-            )
-            ORDER BY SKILL_NAME
+            WHERE JOB_ROLE_ID IN ({placeholders})
+            ORDER BY JOB_ROLE_ID, SKILL_NAME
         """
 
-        cursor.execute(query, tuple(job_role_ids))
+        cursor.execute(query, params)
 
-        rows = rows_to_dict(
-            cursor,
-            cursor.fetchall()
-        )
+        rows = _rows_as_dicts(cursor)
 
-        requirements = {}
+        grouped = defaultdict(list)
 
         for row in rows:
-            role_id = row["job_role_id"]
+            grouped[str(row["JOB_ROLE_ID"])].append(row)
 
-            requirements.setdefault(
-                role_id,
-                []
-            ).append(row)
-
-        return requirements
+        return dict(grouped)
 
     finally:
-        if cursor:
-            cursor.close()
-
-        if conn:
-            release_connection(conn)
+        _close(cursor, connection)
 
 
-# ==========================================
-# FETCH CONFIRMED EMPLOYEE SKILLS
-# ==========================================
+# ---------------------------------------------------------------------
+# Fetch confirmed employee skills
+# ---------------------------------------------------------------------
 
 def get_confirmed_employee_skills(employee_ids):
-    """
-    Fetch employee skills ONLY from
-    CONFIRMED_SKILLS_FINAL.
-
-    EXTRACTED_SKILLS_DRAFT is never accessed here.
-    """
-
     if not employee_ids:
         return {}
 
-    conn = None
-    cursor = None
+    connection = get_connection()
+    cursor = connection.cursor()
 
     try:
-        conn = get_connection()
-        cursor = conn.cursor()
+        placeholders, params = _build_in_clause(
+            employee_ids
+        )
 
         query = f"""
             SELECT
@@ -252,88 +230,156 @@ def get_confirmed_employee_skills(employee_ids):
                 EVIDENCE_SNIPPET,
                 CONFIRMED_AT
             FROM CONFIRMED_SKILLS_FINAL
-            WHERE EMPLOYEE_ID IN (
-                {build_in_clause(employee_ids)}
-            )
-            ORDER BY NAME
+            WHERE EMPLOYEE_ID IN ({placeholders})
+            ORDER BY EMPLOYEE_ID, NAME
         """
 
-        cursor.execute(query, tuple(employee_ids))
+        cursor.execute(query, params)
 
-        rows = rows_to_dict(
-            cursor,
-            cursor.fetchall()
-        )
+        rows = _rows_as_dicts(cursor)
 
-        employee_skills = {}
+        grouped = defaultdict(list)
 
         for row in rows:
-            employee_id = row["employee_id"]
+            grouped[str(row["EMPLOYEE_ID"])].append(row)
 
-            employee_skills.setdefault(
-                employee_id,
-                []
-            ).append(row)
-
-        return employee_skills
+        return dict(grouped)
 
     finally:
-        if cursor:
-            cursor.close()
-
-        if conn:
-            release_connection(conn)
+        _close(cursor, connection)
 
 
-# ==========================================
-# SAVE MATCHING RESULTS
-# ==========================================
+# ---------------------------------------------------------------------
+# Serialization
+# ---------------------------------------------------------------------
 
-def save_matching_results(results):
+def _serialize_result(result):
+    matched = result.get("matched_skills") or []
+    missing = result.get("missing_skills") or []
+
+    explanation_payload = {
+        "explanation": result.get("match_explanation"),
+        "experience_warning": result.get(
+            "experience_warning"
+        ),
+        "missing_mandatory_skills": result.get(
+            "missing_mandatory_skills"
+        ) or [],
+    }
+
+    return (
+        json.dumps(matched, ensure_ascii=False),
+        json.dumps(missing, ensure_ascii=False),
+        json.dumps(
+            explanation_payload,
+            ensure_ascii=False,
+        ),
+    )
+
+
+def _restore_result(row):
+    row["matched_skills"] = _decode_json(
+        row.get("MATCHED_SKILLS"),
+        [],
+    )
+
+    row["missing_skills"] = _decode_json(
+        row.get("MISSING_SKILLS"),
+        [],
+    )
+
+    explanation = _decode_json(
+        row.get("MATCH_EXPLANATION"),
+        None,
+    )
+
+    if isinstance(explanation, dict):
+        row["match_explanation"] = explanation.get(
+            "explanation"
+        )
+
+        row["experience_warning"] = explanation.get(
+            "experience_warning"
+        )
+
+        row["missing_mandatory_skills"] = (
+            explanation.get(
+                "missing_mandatory_skills",
+                [],
+            )
+        )
+
+    else:
+        # Backward compatibility with older plain-text rows.
+        row["match_explanation"] = (
+            explanation
+            if isinstance(explanation, str)
+            else row.get("MATCH_EXPLANATION")
+        )
+
+        row["experience_warning"] = None
+
+        row["missing_mandatory_skills"] = [
+            skill.get("skill_name")
+            for skill in row["missing_skills"]
+            if skill.get("is_mandatory")
+        ]
+
+    row["match_id"] = row.get("MATCH_ID")
+    row["employee_id"] = row.get("EMPLOYEE_ID")
+    row["employee_name"] = row.get("FULL_NAME")
+    row["current_role"] = row.get("CURRENT_ROLE")
+    row["years_experience"] = row.get("YEARS_EXPERIENCE")
+    row["job_role_id"] = row.get("JOB_ROLE_ID")
+    row["job_title"] = row.get("TITLE")
+    row["department"] = row.get("DEPARTMENT")
+
+    row["match_score"] = float(
+        row.get("MATCH_SCORE") or 0
+    )
+
+    row["match_status"] = row.get("MATCH_STATUS")
+
+    return row
+
+
+# ---------------------------------------------------------------------
+# Save matching results and audit events
+# ---------------------------------------------------------------------
+
+def save_matching_results(results, actor="HR"):
     """
-    Insert or update matching results.
+    Save or update matching results.
 
-    One result is maintained for each
-    employee and job role combination.
+    Uses standard SELECT, INSERT and UPDATE statements rather
+    than database-specific upsert syntax.
 
-    All changes are committed together.
+    Matching result writes and audit writes share one transaction.
     """
 
     if not results:
         return 0
 
-    conn = None
-    cursor = None
+    connection = get_connection()
+    cursor = connection.cursor()
 
     try:
-        conn = get_connection()
-        cursor = conn.cursor()
-
-        saved_count = 0
+        employee_summaries = defaultdict(
+            lambda: {
+                "matches": 0,
+                "roles": [],
+            }
+        )
 
         for result in results:
+            employee_id = str(result["employee_id"])
+            job_role_id = str(result["job_role_id"])
 
-            employee_id = result["employee_id"]
-            job_role_id = result["job_role_id"]
-
-            matched_skills_json = json.dumps(
-                result["matched_skills"],
-                ensure_ascii=False
+            matched_json, missing_json, explanation_json = (
+                _serialize_result(result)
             )
 
-            missing_skills_json = json.dumps(
-                result["missing_skills"],
-                ensure_ascii=False
-            )
-
-            explanation = result.get(
-                "match_explanation",
-                ""
-            )
-
-            # Check whether this employee-role pair
-            # already has a matching result.
-
+            # Check for an existing employee-role result.
             cursor.execute(
                 """
                 SELECT MATCH_ID
@@ -343,15 +389,25 @@ def save_matching_results(results):
                 """,
                 (
                     employee_id,
-                    job_role_id
-                )
+                    job_role_id,
+                ),
             )
 
-            existing = cursor.fetchone()
+            existing_rows = cursor.fetchall()
 
-            if existing:
+            if len(existing_rows) > 1:
+                raise RuntimeError(
+                    "Duplicate matching results found for "
+                    f"employee {employee_id} and role {job_role_id}."
+                )
 
-                match_id = existing[0]
+            if existing_rows:
+                existing = existing_rows[0]
+
+                if isinstance(existing, dict):
+                    match_id = existing["MATCH_ID"]
+                else:
+                    match_id = existing[0]
 
                 cursor.execute(
                     """
@@ -361,22 +417,25 @@ def save_matching_results(results):
                         MATCH_STATUS = ?,
                         MATCH_EXPLANATION = ?,
                         MATCHED_SKILLS = ?,
-                        MISSING_SKILLS = ?
+                        MISSING_SKILLS = ?,
+                        UPDATED_AT = CURRENT_TIMESTAMP
                     WHERE MATCH_ID = ?
                     """,
                     (
                         result["match_score"],
-                        "completed",
-                        explanation,
-                        matched_skills_json,
-                        missing_skills_json,
-                        match_id
-                    )
+                        result.get(
+                            "match_status",
+                            "completed",
+                        ),
+                        explanation_json,
+                        matched_json,
+                        missing_json,
+                        match_id,
+                    ),
                 )
 
             else:
-
-                match_id = generate_match_id()
+                match_id = _new_match_id()
 
                 cursor.execute(
                     """
@@ -397,217 +456,180 @@ def save_matching_results(results):
                         employee_id,
                         job_role_id,
                         result["match_score"],
-                        "completed",
-                        explanation,
-                        matched_skills_json,
-                        missing_skills_json
-                    )
+                        result.get(
+                            "match_status",
+                            "completed",
+                        ),
+                        explanation_json,
+                        matched_json,
+                        missing_json,
+                    ),
                 )
 
-            result["match_id"] = match_id
-            saved_count += 1
+            employee_summaries[employee_id]["matches"] += 1
 
-        conn.commit()
+            employee_summaries[employee_id]["roles"].append(
+                job_role_id
+            )
 
-        return saved_count
+        # Write central audit records.
+        for employee_id, summary in employee_summaries.items():
+            details = {
+                "matches_generated": summary["matches"],
+                "job_role_ids": sorted(
+                    set(summary["roles"])
+                ),
+            }
+
+            cursor.execute(
+                """
+                INSERT INTO AUDIT_LOGS (
+                    EMPLOYEE_ID,
+                    ACTOR,
+                    ACTION,
+                    TOOL,
+                    DETAILS
+                )
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    employee_id,
+                    str(actor or "HR"),
+                    "Opportunity matching completed",
+                    "Opportunity Matching Agent",
+                    json.dumps(
+                        details,
+                        ensure_ascii=False,
+                    ),
+                ),
+            )
+
+        connection.commit()
+
+        return len(results)
 
     except Exception:
-        if conn:
-            conn.rollback()
-
+        connection.rollback()
         raise
 
     finally:
-        if cursor:
-            cursor.close()
-
-        if conn:
-            release_connection(conn)
+        _close(cursor, connection)
 
 
-# ==========================================
-# FETCH ALL MATCHING RESULTS
-# ==========================================
+# ---------------------------------------------------------------------
+# Fetch matching results
+# ---------------------------------------------------------------------
+
+_MATCH_SELECT = """
+    SELECT
+        mr.MATCH_ID,
+        mr.EMPLOYEE_ID,
+        e.FULL_NAME,
+        e.CURRENT_ROLE,
+        e.YEARS_EXPERIENCE,
+        mr.JOB_ROLE_ID,
+        jr.TITLE,
+        jr.DEPARTMENT,
+        mr.MATCH_SCORE,
+        mr.MATCH_STATUS,
+        mr.MATCH_EXPLANATION,
+        mr.MATCHED_SKILLS,
+        mr.MISSING_SKILLS,
+        mr.CREATED_AT,
+        mr.UPDATED_AT
+    FROM MATCHING_RESULTS mr
+    INNER JOIN EMPLOYEES e
+        ON e.EMPLOYEE_ID = mr.EMPLOYEE_ID
+    INNER JOIN JOB_ROLES jr
+        ON jr.JOB_ROLE_ID = mr.JOB_ROLE_ID
+"""
+
+
 
 def get_all_matching_results(
     employee_id=None,
-    job_role_id=None
+    job_role_id=None,
+    employee_ids=None,
+    job_role_ids=None,
 ):
-    """
-    Retrieve matching results with employee
-    and job role information.
-
-    Optional filters:
-    - employee_id
-    - job_role_id
-    """
-
-    conn = None
-    cursor = None
+    connection = get_connection()
+    cursor = connection.cursor()
 
     try:
-        conn = get_connection()
-        cursor = conn.cursor()
-
-        query = """
-            SELECT
-                M.MATCH_ID,
-                M.EMPLOYEE_ID,
-                E.FULL_NAME,
-                E.CURRENT_ROLE,
-                E.YEARS_EXPERIENCE,
-
-                M.JOB_ROLE_ID,
-                J.TITLE,
-                J.DEPARTMENT,
-
-                M.MATCH_SCORE,
-                M.MATCH_STATUS,
-                M.MATCH_EXPLANATION,
-                M.MATCHED_SKILLS,
-                M.MISSING_SKILLS,
-                M.CREATED_AT,
-                M.UPDATED_AT
-
-            FROM MATCHING_RESULTS M
-
-            INNER JOIN EMPLOYEES E
-                ON M.EMPLOYEE_ID = E.EMPLOYEE_ID
-
-            INNER JOIN JOB_ROLES J
-                ON M.JOB_ROLE_ID = J.JOB_ROLE_ID
-
-            WHERE 1 = 1
-        """
-
+        query = _MATCH_SELECT
+        conditions = []
         params = []
 
         if employee_id:
-            query += " AND M.EMPLOYEE_ID = ?"
+            conditions.append("mr.EMPLOYEE_ID = ?")
             params.append(employee_id)
 
         if job_role_id:
-            query += " AND M.JOB_ROLE_ID = ?"
+            conditions.append("mr.JOB_ROLE_ID = ?")
             params.append(job_role_id)
+
+        if employee_ids is not None:
+            if not employee_ids:
+                return []
+
+            placeholders, values = _build_in_clause(employee_ids)
+            conditions.append(
+                f"mr.EMPLOYEE_ID IN ({placeholders})"
+            )
+            params.extend(values)
+
+        if job_role_ids is not None:
+            if not job_role_ids:
+                return []
+
+            placeholders, values = _build_in_clause(job_role_ids)
+            conditions.append(
+                f"mr.JOB_ROLE_ID IN ({placeholders})"
+            )
+            params.extend(values)
+
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
 
         query += """
             ORDER BY
-                M.MATCH_SCORE DESC,
-                M.CREATED_AT DESC
+                mr.MATCH_SCORE DESC,
+                mr.UPDATED_AT DESC
         """
 
-        cursor.execute(query, tuple(params))
+        cursor.execute(query, params)
 
-        rows = rows_to_dict(
-            cursor,
-            cursor.fetchall()
-        )
+        rows = _rows_as_dicts(cursor)
 
-        for row in rows:
-
-            try:
-                row["matched_skills"] = json.loads(
-                    row["matched_skills"] or "[]"
-                )
-            except (TypeError, ValueError):
-                row["matched_skills"] = []
-
-            try:
-                row["missing_skills"] = json.loads(
-                    row["missing_skills"] or "[]"
-                )
-            except (TypeError, ValueError):
-                row["missing_skills"] = []
-
-        return rows
+        return [
+            _restore_result(row)
+            for row in rows
+        ]
 
     finally:
-        if cursor:
-            cursor.close()
-
-        if conn:
-            release_connection(conn)
+        _close(cursor, connection)
 
 
-# ==========================================
-# FETCH ONE MATCHING RESULT
-# ==========================================
-
-def get_matching_result_by_id(match_id: str):
-    """
-    Retrieve one matching result by MATCH_ID.
-    """
-
-    conn = None
-    cursor = None
+def get_matching_result_by_id(match_id):
+    connection = get_connection()
+    cursor = connection.cursor()
 
     try:
-        conn = get_connection()
-        cursor = conn.cursor()
+        query = _MATCH_SELECT + """
+            WHERE mr.MATCH_ID = ?
+        """
 
         cursor.execute(
-            """
-            SELECT
-                M.MATCH_ID,
-                M.EMPLOYEE_ID,
-                E.FULL_NAME,
-                E.CURRENT_ROLE,
-                E.YEARS_EXPERIENCE,
-
-                M.JOB_ROLE_ID,
-                J.TITLE,
-                J.DEPARTMENT,
-
-                M.MATCH_SCORE,
-                M.MATCH_STATUS,
-                M.MATCH_EXPLANATION,
-                M.MATCHED_SKILLS,
-                M.MISSING_SKILLS,
-                M.CREATED_AT,
-                M.UPDATED_AT
-
-            FROM MATCHING_RESULTS M
-
-            INNER JOIN EMPLOYEES E
-                ON M.EMPLOYEE_ID = E.EMPLOYEE_ID
-
-            INNER JOIN JOB_ROLES J
-                ON M.JOB_ROLE_ID = J.JOB_ROLE_ID
-
-            WHERE M.MATCH_ID = ?
-            """,
-            (match_id,)
+            query,
+            (match_id,),
         )
 
-        row = cursor.fetchone()
+        rows = _rows_as_dicts(cursor)
 
-        if not row:
+        if not rows:
             return None
 
-        result = rows_to_dict(
-            cursor,
-            [row]
-        )[0]
-
-        try:
-            result["matched_skills"] = json.loads(
-                result["matched_skills"] or "[]"
-            )
-        except (TypeError, ValueError):
-            result["matched_skills"] = []
-
-        try:
-            result["missing_skills"] = json.loads(
-                result["missing_skills"] or "[]"
-            )
-        except (TypeError, ValueError):
-            result["missing_skills"] = []
-
-        return result
+        return _restore_result(rows[0])
 
     finally:
-        if cursor:
-            cursor.close()
-
-        if conn:
-            release_connection(conn)
+        _close(cursor, connection)
