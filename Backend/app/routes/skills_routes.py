@@ -1,32 +1,105 @@
-from fastapi import APIRouter
-from app.models.skills_model import (
-    ProfileExtractRequest,
-    ProfileExtractResponse,
-    SkillConfirmRequest,
-    SkillConfirmResponse,
-    EmployeeSkillsStateResponse
+
+from fastapi import APIRouter, Depends, HTTPException, status
+
+from app.controllers.skills_controller import (
+    extract_skills_controller,
+    confirm_skills_controller,
+    get_skills_state_controller,
+    get_skills_audit_controller
 )
-from app.controllers import skills_controller
-from app.controllers import skills_controller
 
-router = APIRouter(prefix="/api/v1/skills", tags=["Skills Discovery & Confirmation"])
+from app.schemas.skills_schema import (
+    ProfileExtractRequest,
+    SkillConfirmRequest
+)
 
-@router.post("/extract", response_model=ProfileExtractResponse)
-async def extract_skills(payload: ProfileExtractRequest):
-    """FR-1 & FR-2: Extract structured skills with evidence snippets from profile text."""
-    return await skills_controller.extract_skills_controller(payload)
+from app.utils.auth_dependencies import (
+    get_current_employee,
+    require_password_changed
+)
 
-@router.post("/confirm", response_model=SkillConfirmResponse)
-async def confirm_skills(payload: SkillConfirmRequest):
-    """FR-3 & R1: Employee accepts, removes, or adds skills before matching."""
-    return await skills_controller.confirm_skills_controller(payload)
+
+router = APIRouter(
+    prefix="/api/skills",
+    tags=["Employee Skills"]
+)
+
+
+# ==================================================
+# AUTHENTICATION DEPENDENCY
+# ==================================================
+
+def get_active_employee(
+    employee: dict = Depends(get_current_employee)
+):
+    """
+    Ensures the employee is authenticated and has
+    changed their temporary password.
+    """
+    return require_password_changed(employee)
+
+
+# ==================================================
+# 1. EXTRACT SKILLS
+# ==================================================
+
+@router.post("/extract")
+async def extract_employee_skills(
+    payload: ProfileExtractRequest,
+    employee: dict = Depends(get_active_employee)
+):
+    # Always use the authenticated employee ID.
+    payload.employee_id = employee["employee_id"]
+
+    return await extract_skills_controller(payload)
+
+
+# ==================================================
+# 2. CONFIRM SKILLS
+# ==================================================
+
+@router.post("/confirm")
+async def confirm_employee_skills(
+    payload: SkillConfirmRequest,
+    employee: dict = Depends(get_active_employee)
+):
+    # Prevent employees from confirming skills
+    # under another employee's ID.
+    payload.employee_id = employee["employee_id"]
+
+    return await confirm_skills_controller(payload)
+
+
+# ==================================================
+# 3. GET AUDIT LOGS
+# ==================================================
 
 @router.get("/audit/logs")
-async def get_skills_audit_logs():
-    """FR-9 & S4: View audit log events for skills extraction and human confirmation."""
-    return await skills_controller.get_skills_audit_controller()
+async def employee_audit_logs(
+    employee: dict = Depends(get_active_employee)
+):
+    # Employees can only see their own audit logs.
+    return await get_skills_audit_controller(
+        employee["employee_id"]
+    )
 
-@router.get("/{employee_id}", response_model=EmployeeSkillsStateResponse)
-async def get_employee_skills(employee_id: str = "emp-ananya"):
-    """Inspect draft extracted skills vs. human-confirmed skills for an employee."""
-    return await skills_controller.get_skills_state_controller(employee_id)
+
+# ==================================================
+# 4. GET EMPLOYEE SKILLS STATE
+# ==================================================
+
+@router.get("/{employee_id}")
+async def employee_skills_state(
+    employee_id: str,
+    employee: dict = Depends(get_active_employee)
+):
+    # Prevent access to another employee's skills.
+    if employee_id != employee["employee_id"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not authorized to access this employee's skills"
+        )
+
+    return await get_skills_state_controller(
+        employee["employee_id"]
+    )

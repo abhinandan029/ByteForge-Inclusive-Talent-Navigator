@@ -1,192 +1,294 @@
-import { useState } from "react"
 
-export default function LoginPage() {
-  const users = [
-    { label: "Employee", id: "employee" },
-    { label: "HR Business Partner", id: "HR" }
-  ]
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
-  const [activeUser, setActiveUser] = useState(null)
+import { useAuth } from "../contexts/AuthContext";
+import { useHRAuth } from "../contexts/HRAuthContext";
 
-  const handleSubmit = (e) => {
-    e.preventDefault()
+function LoginPage() {
+  const navigate = useNavigate();
 
-    // Navigation will be connected later
-    // after we build App.jsx
-    console.log("Login as:", activeUser)
+  const { login: employeeLogin } = useAuth();
+  const { login: hrLogin } = useHRAuth();
+
+  const [activeUser, setActiveUser] = useState("employee");
+
+  const [employeeId, setEmployeeId] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setError("");
+
+    if (!password) {
+      setError("Please enter your password.");
+      return;
+    }
+
+    if (activeUser === "employee" && !employeeId.trim()) {
+      setError("Please enter your employee ID.");
+      return;
+    }
+
+    if (activeUser === "hr" && !email.trim()) {
+      setError("Please enter your HR email address.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      if (activeUser === "employee") {
+        const result = await employeeLogin(
+          employeeId.trim(),
+          password
+        );
+
+        if (result.employee.must_change_password) {
+          navigate("/change-password", { replace: true });
+        } else {
+          navigate("/dashboard", { replace: true });
+        }
+      } else {
+        await hrLogin(email, password);
+        navigate("/hr/dashboard", { replace: true });
+      }
+    } catch (err) {
+      setError(err.message || "Unable to sign in. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function changeRole(role) {
+    setActiveUser(role);
+    setError("");
+    setPassword("");
+    setShowPassword(false);
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center px-6">
+    <div className="min-h-screen bg-slate-50">
+      <div className="grid min-h-screen lg:grid-cols-2">
 
-      <div className="w-full max-w-md">
-
-        {/* Logo / Brand */}
-        <div className="text-center mb-8">
-
-          <div className="flex justify-center mb-4">
-            <div className="w-14 h-14 rounded-xl bg-blue-600 flex items-center justify-center shadow-lg">
-              <span className="text-white text-2xl font-bold">
-                IT
-              </span>
+        {/* LEFT BRANDING */}
+        <div className="hidden bg-slate-900 px-12 py-12 text-white lg:flex lg:flex-col lg:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-sm font-bold text-slate-900">
+              ITN
             </div>
-          </div>
 
-          <h1 className="text-2xl font-semibold text-slate-900">
-            Inclusive Talent Navigator
-          </h1>
-
-          <p className="text-sm text-slate-500 mt-2">
-            Inclusive Workforce • SAP Hackfest 2026
-          </p>
-
-        </div>
-
-        {/* Login Card */}
-        <form
-          onSubmit={handleSubmit}
-          className="bg-white border border-slate-200 rounded-2xl shadow-sm p-8"
-        >
-
-          <div className="mb-6">
-            <h2 className="text-xl font-semibold text-slate-900">
-              Welcome back
-            </h2>
-
-            <p className="text-sm text-slate-500 mt-1">
-              Select your role to continue
+            <p className="text-sm font-semibold">
+              Inclusive Talent Navigator
             </p>
           </div>
 
-          {/* User Type */}
-          <div className="mb-6">
+          <div className="max-w-xl">
+            <p className="text-sm font-medium text-slate-400">
+              Inclusive Workforce
+            </p>
 
-            <label className="block text-sm font-medium text-slate-700 mb-3">
-              Login as
-            </label>
+            <h1 className="mt-4 text-4xl font-semibold leading-tight">
+              Make skills visible.
+              <br />
+              Make opportunities fair.
+            </h1>
 
-            <div className="grid grid-cols-2 gap-3">
-
-              {users.map((user) => (
-                <label
-                  key={user.id}
-                  className={`cursor-pointer rounded-xl border p-4 transition-all ${
-                    activeUser === user.id
-                      ? "border-blue-600 bg-blue-50 ring-1 ring-blue-600"
-                      : "border-slate-200 hover:border-slate-400"
-                  }`}
-                >
-
-                  <div className="flex items-center gap-3">
-
-                    <input
-                      type="radio"
-                      name="userType"
-                      value={user.id}
-                      checked={activeUser === user.id}
-                      onChange={(e) => setActiveUser(e.target.value)}
-                      className="accent-blue-600"
-                      required
-                    />
-
-                    <span className="text-sm font-medium text-slate-700">
-                      {user.label}
-                    </span>
-
-                  </div>
-
-                </label>
-              ))}
-
-            </div>
-
+            <p className="mt-6 max-w-lg text-base leading-7 text-slate-300">
+              An AI-assisted talent platform that helps employees
+              surface their skills, explore internal opportunities,
+              and keep people involved in important decisions.
+            </p>
           </div>
 
-          {/* Employee Login */}
-          {activeUser === "employee" && (
-            <div className="space-y-4">
+          <div className="text-xs text-slate-500">
+            Agents recommend. Humans decide.
+          </div>
+        </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Employee ID or Username
-                </label>
+        {/* LOGIN SECTION */}
+        <div className="flex items-center justify-center px-6 py-12">
+          <div className="w-full max-w-md">
 
-                <input
-                  type="text"
-                  placeholder="Enter employee ID"
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2.5 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
-                  required
-                />
+            {/* MOBILE BRAND */}
+            <div className="mb-10 lg:hidden">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-xs font-bold text-white">
+                  ITN
+                </div>
+
+                <p className="text-sm font-semibold text-slate-900">
+                  Inclusive Talent Navigator
+                </p>
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Password
-                </label>
-
-                <input
-                  type="password"
-                  placeholder="Enter password"
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2.5 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
-                  required
-                />
-              </div>
-
             </div>
-          )}
 
-          {/* HR Login */}
-          {activeUser === "HR" && (
-            <div className="space-y-4">
+            {/* HEADING */}
+            <div className="mb-8">
+              <p className="text-sm font-medium text-slate-500">
+                Welcome back
+              </p>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Admin ID or Username
-                </label>
+              <h2 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">
+                Sign in to your workspace
+              </h2>
 
-                <input
-                  type="text"
-                  placeholder="Enter admin ID"
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2.5 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Password
-                </label>
-
-                <input
-                  type="password"
-                  placeholder="Enter password"
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2.5 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
-                  required
-                />
-              </div>
-
+              <p className="mt-3 text-sm leading-6 text-slate-600">
+                Select your role to continue to your workspace.
+              </p>
             </div>
-          )}
 
-          {/* Submit */}
-          {activeUser && (
-            <button
-              type="submit"
-              className="w-full mt-6 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition-colors"
+            {/* ROLE SELECTOR */}
+            <div className="mb-6 grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1">
+              <button
+                type="button"
+                onClick={() => changeRole("employee")}
+                className={`rounded-lg px-4 py-2.5 text-sm font-medium transition ${
+                  activeUser === "employee"
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-500 hover:text-slate-900"
+                }`}
+              >
+                Employee
+              </button>
+
+              <button
+                type="button"
+                onClick={() => changeRole("hr")}
+                className={`rounded-lg px-4 py-2.5 text-sm font-medium transition ${
+                  activeUser === "hr"
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-500 hover:text-slate-900"
+                }`}
+              >
+                HR Partner
+              </button>
+            </div>
+
+            {/* LOGIN FORM */}
+            <form
+              onSubmit={handleSubmit}
+              autoComplete="on"
+              className="space-y-5"
             >
-              Sign in
-            </button>
-          )}
+              {activeUser === "employee" ? (
+                <div>
+                  <label
+                    htmlFor="employeeId"
+                    className="mb-2 block text-sm font-medium text-slate-700"
+                  >
+                    Employee ID
+                  </label>
 
-          {/* Footer */}
-          <p className="text-xs text-slate-400 text-center mt-6">
-            Prototype • Synthetic data only
-          </p>
+                  <input
+                    id="employeeId"
+                    type="text"
+                    value={employeeId}
+                    onChange={(event) => setEmployeeId(event.target.value)}
+                    placeholder="Enter your employee ID"
+                    autoComplete="username"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    required
+                    disabled={loading}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 disabled:opacity-60"
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label
+                    htmlFor="hrEmail"
+                    className="mb-2 block text-sm font-medium text-slate-700"
+                  >
+                    HR Email Address
+                  </label>
 
-        </form>
+                  <input
+                    id="hrEmail"
+                    type="email"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    placeholder="Enter your HR email"
+                    autoComplete="new-username"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    required
+                    disabled={loading}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 disabled:opacity-60"
+                  />
+                </div>
+              )}
 
+              {/* PASSWORD */}
+              <div>
+                <label
+                  htmlFor="password"
+                  className="mb-2 block text-sm font-medium text-slate-700"
+                >
+                  Password
+                </label>
+
+                <div className="relative">
+                  <input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    placeholder="Enter your password"
+                    autoComplete="new-password"
+                    required
+                    disabled={loading}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 pr-20 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 disabled:opacity-60"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-3 text-xs font-medium text-slate-500 hover:text-slate-900"
+                  >
+                    {showPassword ? "Hide" : "Show"}
+                  </button>
+                </div>
+              </div>
+
+              {/* ERROR */}
+              {error && (
+                <div
+                  role="alert"
+                  className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600"
+                >
+                  {error}
+                </div>
+              )}
+
+              {/* SUBMIT */}
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full rounded-lg bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {loading
+                  ? "Signing in..."
+                  : activeUser === "employee"
+                    ? "Continue to workspace"
+                    : "Continue to HR workspace"}
+              </button>
+            </form>
+
+            <p className="mt-6 text-center text-xs leading-5 text-slate-400">
+              Secure access to Inclusive Talent Navigator.
+            </p>
+          </div>
+        </div>
       </div>
-
     </div>
-  )
+  );
 }
+
+export default LoginPage;
