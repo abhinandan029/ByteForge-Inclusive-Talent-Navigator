@@ -51,3 +51,9 @@ export const submitMatchDecision = (matchId, payload) =>
     method: "POST",
     body: JSON.stringify(payload),
   });
+
+export const runBiasAudit = (payload = {}) =>
+  request("/api/hr/bias/run", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
