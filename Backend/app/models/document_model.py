@@ -288,7 +288,7 @@ def _rebuild_employee_profile_text(cursor, employee_id: str):
 
     cursor.execute(
         """
-        SELECT EXTRACTED_TEXT
+        SELECT FILE_NAME, DOCUMENT_TYPE, EXTRACTED_TEXT
         FROM EMPLOYEE_DOCUMENTS
         WHERE EMPLOYEE_ID = ?
           AND PROCESSING_STATUS = ?
@@ -302,11 +302,22 @@ def _rebuild_employee_profile_text(cursor, employee_id: str):
     cleaned_documents = []
 
     for row in rows:
-        if row[0]:
-            cleaned_text = sanitize_extracted_text(row[0])
+        file_name, document_type, extracted_text = row
+
+        if extracted_text:
+            cleaned_text = sanitize_extracted_text(extracted_text)
 
             if cleaned_text:
-                cleaned_documents.append(cleaned_text)
+                cleaned_documents.append(
+                    "\n".join(
+                        [
+                            f"DOCUMENT: {file_name or 'Uploaded document'}",
+                            f"TYPE: {document_type or 'UNKNOWN'}",
+                            cleaned_text,
+                            "END DOCUMENT",
+                        ]
+                    )
+                )
 
     # An empty document collection should clear PROFILE_TEXT.
     combined_text = "\n\n".join(cleaned_documents)

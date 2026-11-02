@@ -19,7 +19,19 @@ MAX_FILES_PER_REQUEST = 10
 
 ALLOWED_EXTENSIONS = {
     "pdf",
-    "docx"
+    "docx",
+    "txt",
+    "text",
+    "rtf",
+    "xlsx",
+    "pptx",
+    "png",
+    "jpg",
+    "jpeg",
+    "tif",
+    "tiff",
+    "bmp",
+    "webp",
 }
 
 
@@ -78,7 +90,8 @@ async def upload_documents_controller(
 
             if extension not in ALLOWED_EXTENSIONS:
                 raise ValueError(
-                    "Unsupported file format. Upload PDF or DOCX only."
+                    "Unsupported file format. Upload PDF, DOCX, TXT, RTF, "
+                    "XLSX, PPTX, or a supported image."
                 )
 
             # 2. Read and validate file size.
@@ -99,7 +112,7 @@ async def upload_documents_controller(
             if not extracted_text.strip():
                 raise ValueError(
                     "No readable text found in the document. "
-                    "Scanned PDFs are not supported yet."
+                    "For scanned documents and images, verify that Tesseract OCR is installed."
                 )
 
         except Exception as exc:

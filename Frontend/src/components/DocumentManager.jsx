@@ -104,7 +104,7 @@ export default function DocumentManager({ employeeId, onDocumentsChanged }) {
             Profile Documents
           </h2>
           <p className="text-xs text-slate-500">
-            Upload your resume or job descriptions (PDF or DOCX up to 10 MB) to extract verified skills.
+            Upload resumes, profiles, or supporting documents up to 10 MB to extract verified skills.
           </p>
         </div>
 
@@ -149,7 +149,7 @@ export default function DocumentManager({ employeeId, onDocumentsChanged }) {
           </p>
 
           <p className="mt-1 text-xs text-slate-500">
-            Supports PDF and DOCX documents (Max 10 MB)
+            Supports PDF, DOCX, TXT, RTF, XLSX, PPTX, and common images (Max 10 MB)
           </p>
 
           <input
@@ -157,7 +157,7 @@ export default function DocumentManager({ employeeId, onDocumentsChanged }) {
             id="file-upload"
             type="file"
             multiple
-            accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            accept=".pdf,.docx,.txt,.text,.rtf,.xlsx,.pptx,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.webp,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,application/rtf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.presentationml.presentation,image/*"
             onChange={handleFileSelect}
             disabled={uploading}
             className="hidden"
