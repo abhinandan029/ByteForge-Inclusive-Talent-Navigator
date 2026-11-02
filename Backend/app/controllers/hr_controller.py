@@ -8,10 +8,10 @@ from app.models.hr_model import (
 )
 
 
-def login_hr(email: str, password: str):
-    hr = get_hr_auth_record(email)
+def login_hr(hr_id: str, password: str):
+    hr = get_hr_auth_record(hr_id)
 
-    # Generic error: don't reveal whether the email exists.
+    # Generic error: don't reveal whether the HR ID exists.
     if not hr or not hr.get("password_hash"):
         return None
 

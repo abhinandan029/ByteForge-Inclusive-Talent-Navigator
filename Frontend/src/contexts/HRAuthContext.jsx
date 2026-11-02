@@ -26,7 +26,7 @@ export function HRAuthProvider({ children }) {
     return data;
   }
 
-  async function login(email, password) {
+  async function login(hrId, password) {
     const response = await fetch(`${API_BASE_URL}/api/hr/login`, {
       method: "POST",
       headers: {
@@ -34,7 +34,7 @@ export function HRAuthProvider({ children }) {
       },
       credentials: "include",
       body: JSON.stringify({
-        email: email.trim().toLowerCase(),
+        hr_id: hrId.trim(),
         password,
       }),
     });

@@ -76,6 +76,15 @@ export default function SkillsPage() {
     return data;
   }
 
+  async function handleDocumentsChanged({ action, result } = {}) {
+    if (action === "upload" && result?.uploaded_count > 0) {
+      await handleExtractSkills();
+      return;
+    }
+
+    await refreshSkills();
+  }
+
 
   useEffect(() => {
     let active = true;
@@ -542,7 +551,7 @@ export default function SkillsPage() {
         <div className="mb-6">
           <DocumentManager
             employeeId={employeeId}
-            onDocumentsChanged={refreshSkills}
+            onDocumentsChanged={handleDocumentsChanged}
           />
         </div>
 

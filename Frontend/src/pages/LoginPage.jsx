@@ -14,7 +14,7 @@ function LoginPage() {
   const [activeUser, setActiveUser] = useState("employee");
 
   const [employeeId, setEmployeeId] = useState("");
-  const [email, setEmail] = useState("");
+  const [hrId, setHrId] = useState("");
   const [password, setPassword] = useState("");
 
   const [showPassword, setShowPassword] = useState(false);
@@ -35,8 +35,8 @@ function LoginPage() {
       return;
     }
 
-    if (activeUser === "hr" && !email.trim()) {
-      setError("Please enter your HR email address.");
+    if (activeUser === "hr" && !hrId.trim()) {
+      setError("Please enter your HR ID.");
       return;
     }
 
@@ -55,7 +55,7 @@ function LoginPage() {
           navigate("/dashboard", { replace: true });
         }
       } else {
-        await hrLogin(email, password);
+        await hrLogin(hrId.trim(), password);
         navigate("/hr/dashboard", { replace: true });
       }
     } catch (err) {
@@ -204,21 +204,22 @@ function LoginPage() {
               ) : (
                 <div>
                   <label
-                    htmlFor="hrEmail"
+                    htmlFor="hrId"
                     className="mb-2 block text-sm font-medium text-slate-700"
                   >
-                    HR Email Address
+                    HR ID
                   </label>
 
                   <input
-                    id="hrEmail"
-                    type="email"
-                    value={email}
-                    onChange={(event) => setEmail(event.target.value)}
-                    placeholder="Enter your HR email"
-                    autoComplete="new-username"
+                    id="hrId"
+                    type="text"
+                    value={hrId}
+                    onChange={(event) => setHrId(event.target.value)}
+                    placeholder="Enter your HR ID"
+                    autoComplete="username"
                     autoCapitalize="none"
                     autoCorrect="off"
+                    spellCheck={false}
                     required
                     disabled={loading}
                     className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 disabled:opacity-60"
