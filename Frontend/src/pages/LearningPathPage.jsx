@@ -400,6 +400,9 @@ export default function LearningPathPage() {
                       <Info size={14} className="text-slate-400" />
                       <span>{market.how_this_was_produced}</span>
                     </div>
+                    <span className="mt-3 inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
+                      {market.is_simulated ? "Simulated fallback" : "Based on active internal roles"}
+                    </span>
                   </div>
 
                   <div className="rounded-2xl border border-rose-100 bg-rose-50/60 p-5 shadow-sm">
@@ -422,7 +425,7 @@ export default function LearningPathPage() {
                       Skills Market Demand Breakdown
                     </h3>
                     <p className="text-xs text-slate-500">
-                      Real-time demand signals matched against your confirmed skillset.
+                      Active internal role requirements matched against your confirmed skillset.
                     </p>
                   </div>
 
@@ -470,7 +473,12 @@ export default function LearningPathPage() {
                                 </span>
                               </td>
                               <td className="px-6 py-4 text-xs text-slate-500 max-w-xs">
-                                {item.market_note || "—"}
+                                <div>{item.market_note || "—"}</div>
+                                {item.role_titles?.length ? (
+                                  <div className="mt-1 text-[11px] font-medium text-indigo-600">
+                                    {item.role_titles.join(", ")}
+                                  </div>
+                                ) : null}
                               </td>
                             </tr>
                           ))

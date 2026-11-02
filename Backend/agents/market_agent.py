@@ -4,7 +4,7 @@ import asyncio
 from pathlib import Path
 import sys
 from typing import List, Dict, Any
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
@@ -15,14 +15,16 @@ class SkillDemandItem(BaseModel):
     trend: str
     open_internal_roles: int
     market_note: str
+    source: str = "SIMULATED_MARKET_DATA"
+    role_titles: List[str] = Field(default_factory=list)
 
 class MarketIntelligenceResponse(BaseModel):
     employee_id: str
-    data_label: str = "SIMULATED_MARKET_DATA"
-    is_simulated: bool = True
+    data_label: str = "LIVE_INTERNAL_ROLE_DEMAND"
+    is_simulated: bool = False
     how_this_was_produced: str = (
-        "Market Intelligence Agent matched confirmed employee skills against the "
-        "simulated internal & industry demand dataset."
+        "Market Intelligence Agent matched confirmed employee skills against active "
+        "internal job-role requirements, with simulated market data as fallback."
     )
     in_demand_skills: List[SkillDemandItem]
     high_demand_count: int
