@@ -21,6 +21,7 @@ import {
 } from "../services/skillsApi";
 
 import { useAuth } from "../contexts/AuthContext";
+import DocumentManager from "../components/DocumentManager";
 
 
 export default function SkillsPage() {
@@ -519,6 +520,14 @@ export default function SkillsPage() {
           </div>
         )}
 
+
+        {/* DOCUMENT MANAGEMENT */}
+        <div className="mb-6">
+          <DocumentManager
+            employeeId={employeeId}
+            onDocumentsChanged={refreshSkills}
+          />
+        </div>
 
         {/* AI EXTRACTION */}
 
