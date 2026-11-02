@@ -66,8 +66,15 @@ export async function addSkillsToJobRole(jobRoleId, skills) {
   });
 }
 
+// Remove a required skill from a job role
+export async function removeSkillFromJobRole(jobRoleId, requirementId) {
+  return request(
+    `/${encodeURIComponent(jobRoleId)}/skills/${encodeURIComponent(requirementId)}`,
+    { method: "DELETE" }
+  );
+}
+
 // Get HR audit logs
 export async function getHRAuditLogs() {
   return request("/audit/logs");
 }
-
