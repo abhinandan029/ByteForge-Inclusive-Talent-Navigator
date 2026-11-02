@@ -48,7 +48,8 @@ HR remains responsible for reviewing flags and recording decisions.
 1. An authenticated employee calls `GET /api/market/intelligence`.
 2. The market model fetches confirmed skills.
 3. `run_market_intelligence` starts `market_mcp_server.py` over stdio.
-4. The MCP tool matches skills against the simulated market-demand dataset.
+4. The MCP tool matches skills against market-demand rows fetched from the
+   database.
 5. The model records the central audit event and the controller returns the
    existing `MarketIntelligenceResponse` shape.
 
@@ -58,6 +59,6 @@ HR remains responsible for reviewing flags and recording decisions.
 2. The learning model fetches the employee's persisted matching results and
    converts the top roles into the agent's session-record shape.
 3. `run_learning_pathway` starts `learning_mcp_server.py` over stdio.
-4. The MCP tool selects courses from the simulated SAP Learning Hub dataset.
+4. The MCP tool selects courses from database-backed learning-course rows.
 5. The model records the central audit event and the controller returns the
    existing `LearningPathwayResponse` shape.

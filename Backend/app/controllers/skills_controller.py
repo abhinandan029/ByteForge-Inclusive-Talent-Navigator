@@ -19,6 +19,7 @@ from app.models.skills_model import (
     get_audit_logs,
     get_employee_profile_text,
 )
+from app.models.skill_taxonomy_model import get_skill_taxonomy
 
 
 # =====================================================
@@ -60,10 +61,14 @@ async def extract_skills_controller(payload):
             get_employee_profile_text,
             employee_id
         )
+        taxonomy_rows = await run_in_threadpool(
+            get_skill_taxonomy
+        )
 
         agent_result = await skills_agent.discover_skills(
             employee_id=employee_id,
-            profile_text=profile_text.strip()
+            profile_text=profile_text.strip(),
+            taxonomy_rows=taxonomy_rows,
         )
 
         proposed_skills = agent_result.get(
@@ -172,6 +177,9 @@ async def confirm_skills_controller(payload):
             get_employee_skills,
             employee_id
         )
+        taxonomy_rows = await run_in_threadpool(
+            get_skill_taxonomy
+        )
 
         employee = current_state["employee"]
 
@@ -272,7 +280,8 @@ async def confirm_skills_controller(payload):
                 ),
                 accepted_skills=accepted_skills,
                 added_raw_skills=added_raw_skills,
-                removed_skill_ids=removed_skill_ids
+                removed_skill_ids=removed_skill_ids,
+                taxonomy_rows=taxonomy_rows,
             )
 
             final_skills = agent_result.get(

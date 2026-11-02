@@ -1,10 +1,7 @@
 import json
-from pathlib import Path
-
 from mcp.server.fastmcp import FastMCP
 
 mcp = FastMCP("career-development-server")
-COURSES_FILE = Path(__file__).resolve().parents[1] / "data" / "courses.json"
 
 
 @mcp.tool()
@@ -21,11 +18,7 @@ def generate_learning_pathway(
     if not isinstance(session_record, dict):
         raise ValueError("Session record must be a JSON object.")
 
-    try:
-        with COURSES_FILE.open("r", encoding="utf-8") as file:
-            courses_data = json.load(file)
-    except FileNotFoundError:
-        courses_data = []
+    courses_data = session_record.get("courses") or []
 
     role_matches = session_record.get("role_matches", {}).get(
         "recommended_roles", []

@@ -20,6 +20,9 @@ matching and bias review workflows.
 
 - Skills Discovery, Opportunity Matching, and Bias Review use MCP client/server
   boundaries.
+- Skills Discovery, Market Intelligence, and Career Development use only
+  deterministic code plus database-provided domain data; no external LLM is
+  used.
 - MCP servers use stdio transport and are launched by their corresponding
   Python agent.
 - Agents do not access the database directly.
@@ -27,6 +30,8 @@ matching and bias review workflows.
 - Models own database reads, writes, and central `AUDIT_LOGS` persistence.
 - Document text extraction currently uses local `pypdf` and `python-docx`.
 - SAP Document AI is not part of the current implementation.
+- Skill taxonomy, market demand, and learning courses are seeded through
+  `Backend/database/migrations/` and are not read from runtime JSON files.
 
 When changing an agent, preserve the public controller-facing function and
 route response shape unless the task explicitly requires an API change.
