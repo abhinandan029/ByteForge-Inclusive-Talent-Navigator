@@ -8,9 +8,24 @@ const navigation = [
     icon: "▦",
   },
   {
+    name: "Job Roles",
+    path: "/hr/jobs",
+    icon: "▣",
+  },
+  {
+    name: "Talent Matching",
+    path: "/hr/matching",
+    icon: "⇄",
+  },
+  {
     name: "Bias Audit",
     path: "/hr/bias-audit",
     icon: "◈",
+  },
+  {
+    name: "Audit Log",
+    path: "/hr/audit-log",
+    icon: "≡",
   },
 ];
 

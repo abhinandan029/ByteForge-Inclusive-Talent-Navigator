@@ -185,7 +185,7 @@ function HRDashboard() {
             </p>
           </div>
 
-          <div className="mt-6 grid gap-4 md:grid-cols-2">
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <button
               type="button"
               onClick={() => navigate("/hr/bias-audit")}
@@ -202,29 +202,77 @@ function HRDashboard() {
                   </h3>
 
                   <p className="mt-1 text-xs text-slate-500">
-                    Inspect and review AI-generated fairness flags.
+                    Inspect and review AI fairness flags.
                   </p>
                 </div>
               </div>
             </button>
 
-            <div className="rounded-xl border border-slate-200 p-5">
+            <button
+              type="button"
+              onClick={() => navigate("/hr/matching")}
+              className="rounded-xl border border-slate-200 p-5 text-left transition hover:border-slate-400 hover:bg-slate-50"
+            >
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-lg text-slate-700">
-                  ✓
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50 text-lg text-indigo-700">
+                  ⇄
                 </div>
 
                 <div>
                   <h3 className="text-sm font-semibold text-slate-900">
-                    Human-in-the-loop decisions
+                    Talent Matching
                   </h3>
 
                   <p className="mt-1 text-xs text-slate-500">
-                    HR retains final authority over candidate decisions.
+                    Run AI internal opportunity matching.
                   </p>
                 </div>
               </div>
-            </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => navigate("/hr/jobs")}
+              className="rounded-xl border border-slate-200 p-5 text-left transition hover:border-slate-400 hover:bg-slate-50"
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 text-lg text-emerald-700">
+                  ▣
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900">
+                    Manage Job Roles
+                  </h3>
+
+                  <p className="mt-1 text-xs text-slate-500">
+                    Create and edit job vacancy criteria.
+                  </p>
+                </div>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => navigate("/hr/audit-log")}
+              className="rounded-xl border border-slate-200 p-5 text-left transition hover:border-slate-400 hover:bg-slate-50"
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-lg text-slate-700">
+                  ≡
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900">
+                    Audit Log
+                  </h3>
+
+                  <p className="mt-1 text-xs text-slate-500">
+                    View immutable HR compliance records.
+                  </p>
+                </div>
+              </div>
+            </button>
           </div>
         </section>
 

@@ -7,6 +7,7 @@ import {
   getMatchDecision,
   reviewBiasFlag,
   submitMatchDecision,
+  runBiasAudit,
 } from "../services/hrApi";
 
 const initialFilters = {
@@ -80,7 +81,34 @@ function HRBiasAudit() {
   const [savingReview, setSavingReview] = useState(false);
   const [savingDecision, setSavingDecision] = useState(false);
 
+  const [runningAudit, setRunningAudit] = useState(false);
+  const [auditRunResult, setAuditRunResult] = useState(null);
+
   const [error, setError] = useState("");
+
+  async function handleRunAudit() {
+    if (
+      !confirm(
+        "Run the Bias Review Agent across all active job roles and matching results?"
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setRunningAudit(true);
+      setError("");
+      setAuditRunResult(null);
+
+      const result = await runBiasAudit();
+      setAuditRunResult(result);
+      await loadFlags();
+    } catch (err) {
+      setError(err.message || "Failed to execute Bias Review Agent.");
+    } finally {
+      setRunningAudit(false);
+    }
+  }
 
   useEffect(() => {
     loadFlags();
@@ -284,15 +312,74 @@ function HRBiasAudit() {
     <div className="min-h-full bg-gray-50 p-4 md:p-8">
       <div className="mx-auto max-w-7xl">
         {/* Page heading */}
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-gray-900 md:text-3xl">
-            Bias Audit
-          </h1>
+        <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 md:text-3xl">
+              Bias Audit
+            </h1>
 
-          <p className="mt-2 text-sm text-gray-600">
-            Review AI-generated bias flags and make final candidate decisions.
-          </p>
+            <p className="mt-2 text-sm text-gray-600">
+              Review AI-generated bias flags and make final candidate decisions.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleRunAudit}
+            disabled={runningAudit || loading}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-60 transition"
+          >
+            <span>{runningAudit ? "Running Bias Review Agent..." : "Run AI Bias Review Agent"}</span>
+          </button>
         </div>
+
+        {/* AUDIT EXECUTION SUMMARY */}
+        {auditRunResult && (
+          <div className="mb-6 rounded-2xl border border-indigo-100 bg-indigo-50/70 p-5">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-900">
+                Agent Execution Results ({auditRunResult.audit_status || "COMPLETE"})
+              </h3>
+              <button
+                type="button"
+                onClick={() => setAuditRunResult(null)}
+                className="text-xs text-indigo-600 hover:text-indigo-800"
+              >
+                ✕ Dismiss
+              </button>
+            </div>
+
+            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-5 text-xs">
+              <div className="rounded-lg bg-white p-3 border border-indigo-100">
+                <span className="text-slate-400">Roles Audited</span>
+                <p className="text-base font-bold text-slate-800">{auditRunResult.total_roles_audited}</p>
+              </div>
+              <div className="rounded-lg bg-white p-3 border border-indigo-100">
+                <span className="text-slate-400">Matches Audited</span>
+                <p className="text-base font-bold text-slate-800">{auditRunResult.total_matches_audited}</p>
+              </div>
+              <div className="rounded-lg bg-white p-3 border border-indigo-100">
+                <span className="text-rose-500 font-semibold">High Severity</span>
+                <p className="text-base font-bold text-rose-600">{auditRunResult.high_severity_count}</p>
+              </div>
+              <div className="rounded-lg bg-white p-3 border border-indigo-100">
+                <span className="text-amber-500 font-semibold">Medium Severity</span>
+                <p className="text-base font-bold text-amber-600">{auditRunResult.medium_severity_count}</p>
+              </div>
+              <div className="rounded-lg bg-white p-3 border border-indigo-100">
+                <span className="text-emerald-500 font-semibold">Low Severity</span>
+                <p className="text-base font-bold text-emerald-600">{auditRunResult.low_severity_count}</p>
+              </div>
+            </div>
+
+            {auditRunResult.hr_summary_recommendation && (
+              <div className="mt-3 rounded-lg bg-white p-3 text-xs leading-relaxed text-slate-700 border border-indigo-100">
+                <span className="font-bold text-indigo-950">HR Recommendation: </span>
+                {auditRunResult.hr_summary_recommendation}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Filters */}
         <form

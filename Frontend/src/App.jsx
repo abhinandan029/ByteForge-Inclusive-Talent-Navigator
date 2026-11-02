@@ -23,10 +23,17 @@ import LoginPage from "./pages/LoginPage.jsx";
 import ChangePasswordPage from "./pages/ChangePasswordPage.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import SkillsPage from "./pages/SkillsPage.jsx";
+import MatchingPage from "./pages/MatchingPage.jsx";
+import FairnessReviewPage from "./pages/FairnessReviewPage.jsx";
+import LearningPathPage from "./pages/LearningPathPage.jsx";
+import AuditLogPage from "./pages/AuditLogPage.jsx";
 
 // HR pages
 import HRDashboard from "./pages/HRDashboard.jsx";
+import HRJobRoles from "./pages/HRJobRoles.jsx";
+import HRMatching from "./pages/HRMatching.jsx";
 import HRBiasAudit from "./pages/HRBiasAudit.jsx";
+import HRAuditLog from "./pages/HRAuditLog.jsx";
 
 
 // ==================================================
@@ -238,45 +245,25 @@ function AppRoutes() {
           {/* Role Matching */}
           <Route
             path="/matching"
-            element={
-              <PlaceholderPage
-                title="Role Matching"
-                description="Recommended internal roles will appear here after employee skill confirmation."
-              />
-            }
+            element={<MatchingPage />}
           />
 
           {/* Employee Fairness Review */}
           <Route
             path="/bias-audit"
-            element={
-              <PlaceholderPage
-                title="Fairness Review"
-                description="Fairness signals and human review will be implemented in the next stage."
-              />
-            }
+            element={<FairnessReviewPage />}
           />
 
           {/* Learning Path */}
           <Route
             path="/learning"
-            element={
-              <PlaceholderPage
-                title="Learning Path"
-                description="Recommended learning opportunities will appear here."
-              />
-            }
+            element={<LearningPathPage />}
           />
 
           {/* Audit Log */}
           <Route
             path="/audit-log"
-            element={
-              <PlaceholderPage
-                title="Audit Log"
-                description="The audit trail for AI actions and employee confirmations will appear here."
-              />
-            }
+            element={<AuditLogPage />}
           />
 
         </Route>
@@ -296,10 +283,28 @@ function AppRoutes() {
             element={<HRDashboard />}
           />
 
+          {/* HR Job Roles Management */}
+          <Route
+            path="/hr/jobs"
+            element={<HRJobRoles />}
+          />
+
+          {/* HR Opportunity Matching */}
+          <Route
+            path="/hr/matching"
+            element={<HRMatching />}
+          />
+
           {/* HR Bias Audit */}
           <Route
             path="/hr/bias-audit"
             element={<HRBiasAudit />}
+          />
+
+          {/* HR Activity Audit Log */}
+          <Route
+            path="/hr/audit-log"
+            element={<HRAuditLog />}
           />
 
         </Route>
