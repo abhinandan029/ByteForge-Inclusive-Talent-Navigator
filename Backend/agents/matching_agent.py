@@ -1,10 +1,16 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
 import re
 from collections import defaultdict
+from pathlib import Path
+import sys
 from typing import Any
 
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
 
 # ---------------------------------------------------------------------
 # Generic helpers
@@ -212,7 +218,7 @@ def _experience_warning(
 # Core Opportunity Matching Agent
 # ---------------------------------------------------------------------
 
-def run_inclusive_matching(
+def _run_inclusive_matching_core(
     employees: list[dict],
     job_roles: list[dict],
     job_requirements: Any,
@@ -464,3 +470,61 @@ def run_inclusive_matching(
     )
 
     return results
+
+
+async def _run_matching_mcp(
+    employees: list[dict],
+    job_roles: list[dict],
+    job_requirements: Any,
+    employee_skills: Any,
+) -> list[dict]:
+    server_script = (
+        Path(__file__).resolve().parents[1]
+        / "mcp_server"
+        / "matching_mcp_server.py"
+    )
+    server_params = StdioServerParameters(
+        command=sys.executable,
+        args=[str(server_script)],
+        env=None,
+    )
+
+    async with stdio_client(server_params) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            response = await session.call_tool(
+                "run_matching",
+                arguments={
+                    "employees_json": json.dumps(employees),
+                    "job_roles_json": json.dumps(job_roles),
+                    "job_requirements_json": json.dumps(job_requirements),
+                    "employee_skills_json": json.dumps(employee_skills),
+                },
+            )
+
+            if response.isError or not response.content:
+                raise RuntimeError("MCP matching tool execution failed.")
+
+            payload = json.loads(response.content[0].text)
+            results = payload.get("results")
+            if not isinstance(results, list):
+                raise ValueError("MCP matching returned an invalid result list.")
+
+            return results
+
+
+def run_inclusive_matching(
+    employees: list[dict],
+    job_roles: list[dict],
+    job_requirements: Any,
+    employee_skills: Any,
+) -> list[dict]:
+    """Run Opportunity Matching through the Matching MCP server."""
+    return asyncio.run(
+        _run_matching_mcp(
+            employees,
+            job_roles,
+            job_requirements,
+            employee_skills,
+        )
+    )

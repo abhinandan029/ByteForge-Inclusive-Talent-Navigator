@@ -1,6 +1,13 @@
 
+import asyncio
+import json
+from pathlib import Path
 import re
+import sys
 from typing import Any
+
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
 
 
 # ---------------------------------------------------------------------
@@ -378,7 +385,7 @@ def evaluate_matching_result(result: dict) -> list[dict]:
 # Main Bias Review Agent
 # ---------------------------------------------------------------------
 
-def run_bias_audit(
+def _run_bias_audit_core(
     matching_results: list[dict],
     job_roles: list[dict],
 ) -> dict:
@@ -447,3 +454,54 @@ def run_bias_audit(
         "flags": flags,
         "hr_summary_recommendation": summary,
     }
+
+
+async def _run_bias_mcp(
+    matching_results: list[dict],
+    job_roles: list[dict],
+) -> dict:
+    server_script = (
+        Path(__file__).resolve().parents[1]
+        / "mcp_server"
+        / "bias_mcp_server.py"
+    )
+    server_params = StdioServerParameters(
+        command=sys.executable,
+        args=[str(server_script)],
+        env=None,
+    )
+
+    async with stdio_client(server_params) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            response = await session.call_tool(
+                "run_bias_audit",
+                arguments={
+                    "matching_results_json": json.dumps(matching_results),
+                    "job_roles_json": json.dumps(job_roles),
+                },
+            )
+
+            if response.isError or not response.content:
+                raise RuntimeError("MCP bias review tool execution failed.")
+
+            payload = json.loads(response.content[0].text)
+            if not isinstance(payload, dict) or not isinstance(
+                payload.get("flags"), list
+            ):
+                raise ValueError("MCP bias review returned an invalid response.")
+
+            return payload
+
+
+def run_bias_audit(
+    matching_results: list[dict],
+    job_roles: list[dict],
+) -> dict:
+    """Run Bias Review through the Bias Review MCP server."""
+    return asyncio.run(
+        _run_bias_mcp(
+            matching_results,
+            job_roles,
+        )
+    )
