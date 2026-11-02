@@ -12,7 +12,7 @@ Backend/
   app/schemas/            Pydantic request/response models
   app/utils/              Shared extraction, auth, and audit helpers
   mcp_server/             FastMCP server tools
-  data/                   Static course, role, and market datasets
+  database/migrations/    Database schema and seed migrations
 ```
 
 ## Useful commands on Windows
@@ -53,6 +53,9 @@ Provision an employee account from the repository root:
 - Keep domain decisions in agents/MCP tools, not controllers.
 - Validate MCP responses and raise explicit errors.
 - Do not add local audit files or secrets.
+- Do not add domain data as Python constants or runtime JSON files. Add or
+  update database migrations and fetch the data through models.
+- Do not add external LLM, AI provider, or hosted inference calls.
 - Run compilation and a focused real MCP-path smoke test.
 - For FastAPI 0.162+, included routers may appear as deferred router entries;
   validate new paths through the router's own `.routes` or the generated

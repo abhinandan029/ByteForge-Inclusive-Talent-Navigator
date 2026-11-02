@@ -25,11 +25,14 @@ class SkillsDiscoveryAgent:
     async def discover_skills(
         self,
         employee_id: str,
-        profile_text: str
+        profile_text: str,
+        taxonomy_rows: List[Dict[str, Any]] | None = None,
     ) -> Dict[str, Any]:
 
         if not profile_text or not profile_text.strip():
             raise ValueError("Profile text cannot be empty.")
+
+        taxonomy_rows = taxonomy_rows or []
 
         # Connect to skills-server through MCP stdio.
         async with stdio_client(self.server_params) as (read, write):
@@ -38,9 +41,10 @@ class SkillsDiscoveryAgent:
 
                 # Step 1: Extract raw skills.
                 extract_res = await session.call_tool(
-                    "extract_skills",
+                    "extract_skills_tool",
                     arguments={
-                        "text": profile_text
+                        "text": profile_text,
+                        "taxonomy_json": json.dumps(taxonomy_rows),
                     }
                 )
 
@@ -58,10 +62,6 @@ class SkillsDiscoveryAgent:
                     extract_res.content[0].text
                 )
 
-                print("\n========== MCP EXTRACTION ==========")
-                print(json.dumps(extract_payload, indent=2))
-                print("====================================\n")
-
                 extracted_items = extract_payload.get(
                     "extracted_items",
                     []
@@ -78,7 +78,8 @@ class SkillsDiscoveryAgent:
                 norm_res = await session.call_tool(
                     "normalize_skills",
                     arguments={
-                        "raw_skills_json": raw_items_str
+                        "raw_skills_json": raw_items_str,
+                        "taxonomy_json": json.dumps(taxonomy_rows),
                     }
                 )
 
@@ -95,10 +96,6 @@ class SkillsDiscoveryAgent:
                 norm_payload = json.loads(
                     norm_res.content[0].text
                 )
-
-                print("\n========== MCP NORMALIZATION =======")
-                print(json.dumps(norm_payload, indent=2))
-                print("====================================\n")
 
                 normalized_skills = norm_payload.get(
                     "normalized_skills",
@@ -129,7 +126,8 @@ class SkillsDiscoveryAgent:
         employee_name: str,
         accepted_skills: List[Dict[str, Any]],
         added_raw_skills: List[str],
-        removed_skill_ids: List[str]
+        removed_skill_ids: List[str],
+        taxonomy_rows: List[Dict[str, Any]] | None = None,
     ) -> Dict[str, Any]:
         """
         Processes the employee's final skill selection.
@@ -140,6 +138,8 @@ class SkillsDiscoveryAgent:
 
         Database audit logging is handled by skills_model.py.
         """
+
+        taxonomy_rows = taxonomy_rows or []
 
         # Remove rejected skills from accepted suggestions.
         final_skills = [
@@ -168,9 +168,8 @@ class SkillsDiscoveryAgent:
                     norm_res = await session.call_tool(
                         "normalize_skills",
                         arguments={
-                            "raw_skills_json": json.dumps(
-                                new_items_payload
-                            )
+                            "raw_skills_json": json.dumps(new_items_payload),
+                            "taxonomy_json": json.dumps(taxonomy_rows),
                         }
                     )
 

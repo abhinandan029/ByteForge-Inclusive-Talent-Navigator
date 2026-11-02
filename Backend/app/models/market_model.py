@@ -18,7 +18,20 @@ def get_market_session_record(employee_id: str) -> dict:
         )
         columns = [column[0].lower() for column in cursor.description]
         skills = [dict(zip(columns, row)) for row in cursor.fetchall()]
-        return {"confirmed_skills": skills}
+        cursor.execute(
+            """
+            SELECT SKILL, DEMAND_LEVEL, TREND, OPEN_INTERNAL_ROLES, MARKET_NOTE
+            FROM MARKET_DEMAND
+            WHERE IS_ACTIVE = 1
+            ORDER BY SKILL
+            """
+        )
+        columns = [column[0].lower() for column in cursor.description]
+        market_data = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        return {
+            "confirmed_skills": skills,
+            "market_data": market_data,
+        }
     finally:
         cursor.close()
         release_connection(conn)

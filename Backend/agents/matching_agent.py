@@ -5,6 +5,8 @@ import asyncio
 import json
 import re
 from collections import defaultdict
+from decimal import Decimal
+from datetime import date, datetime
 from pathlib import Path
 import sys
 from typing import Any
@@ -111,6 +113,19 @@ def _to_bool(value: Any) -> bool:
         }
 
     return bool(value)
+
+
+def _json_default(value: Any):
+    """Convert database scalar values before sending them to MCP."""
+    if isinstance(value, Decimal):
+        return float(value)
+
+    if isinstance(value, (date, datetime)):
+        return value.isoformat()
+
+    raise TypeError(
+        f"Object of type {type(value).__name__} is not JSON serializable"
+    )
 
 
 # ---------------------------------------------------------------------
@@ -495,10 +510,22 @@ async def _run_matching_mcp(
             response = await session.call_tool(
                 "run_matching",
                 arguments={
-                    "employees_json": json.dumps(employees),
-                    "job_roles_json": json.dumps(job_roles),
-                    "job_requirements_json": json.dumps(job_requirements),
-                    "employee_skills_json": json.dumps(employee_skills),
+                    "employees_json": json.dumps(
+                        employees,
+                        default=_json_default,
+                    ),
+                    "job_roles_json": json.dumps(
+                        job_roles,
+                        default=_json_default,
+                    ),
+                    "job_requirements_json": json.dumps(
+                        job_requirements,
+                        default=_json_default,
+                    ),
+                    "employee_skills_json": json.dumps(
+                        employee_skills,
+                        default=_json_default,
+                    ),
                 },
             )
 

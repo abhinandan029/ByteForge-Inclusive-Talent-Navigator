@@ -1,10 +1,7 @@
 import json
-from pathlib import Path
-
 from mcp.server.fastmcp import FastMCP
 
 mcp = FastMCP("market-intelligence-server")
-DATA_FILE = Path(__file__).resolve().parents[1] / "data" / "market_demand.json"
 
 
 @mcp.tool()
@@ -18,11 +15,7 @@ def analyze_market_demand(employee_id: str, session_record_json: str) -> str:
     if not isinstance(session_record, dict):
         raise ValueError("Session record must be a JSON object.")
 
-    try:
-        with DATA_FILE.open("r", encoding="utf-8") as file:
-            market_data = json.load(file)
-    except FileNotFoundError:
-        market_data = []
+    market_data = session_record.get("market_data") or []
 
     lookup = {item["skill"].lower(): item for item in market_data}
     raw_skills = (
@@ -57,7 +50,13 @@ def analyze_market_demand(employee_id: str, session_record_json: str) -> str:
         matched.append({
             "skill": name,
             "user_level": level,
-            **item,
+            "demand_level": item.get("demand_level", "Medium"),
+            "trend": item.get("trend", "Stable (+8% YoY)"),
+            "open_internal_roles": item.get("open_internal_roles", 2),
+            "market_note": item.get(
+                "market_note",
+                "Steady internal demand across engineering teams.",
+            ),
         })
 
     high_count = sum(item["demand_level"] == "High" for item in matched)

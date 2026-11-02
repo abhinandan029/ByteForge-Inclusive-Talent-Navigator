@@ -49,6 +49,10 @@ non-MCP implementation.
 MCP servers expose specialized tools and return structured JSON results. They
 must not replace domain-level orchestration or persistence.
 
+Skills, Market Intelligence, and Career Development MCP tools receive
+database-backed domain data from their model/controller boundary. They do not
+call external LLMs or read runtime JSON datasets.
+
 ## MCP boundaries
 
 | Domain | Agent entry point | MCP server | Tool |
@@ -71,3 +75,7 @@ persistence is handled by `app/models/bias_audit_model.py`; Skills persistence
 is handled by `app/models/skills_model.py`; Market Intelligence persistence is
 handled by `app/models/market_model.py`; Career Development persistence is
 handled by `app/models/learning_model.py`.
+
+Domain-data tables are defined and seeded in
+`Backend/database/migrations/001_agent_domain_data_mysql.sql` and
+`001_agent_domain_data_hana.sql`.

@@ -40,7 +40,20 @@ def get_learning_session_record(employee_id: str) -> dict:
                 ],
                 "match_score": record["match_score"],
             })
-        return {"role_matches": {"recommended_roles": roles}}
+        cursor.execute(
+            """
+            SELECT COURSE_ID, TITLE, TARGET_SKILL, DURATION, SAP_LEARNING_HUB_URL
+            FROM LEARNING_COURSES
+            WHERE IS_ACTIVE = 1
+            ORDER BY COURSE_ID
+            """
+        )
+        columns = [column[0].lower() for column in cursor.description]
+        courses = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        return {
+            "role_matches": {"recommended_roles": roles},
+            "courses": courses,
+        }
     finally:
         cursor.close()
         release_connection(conn)

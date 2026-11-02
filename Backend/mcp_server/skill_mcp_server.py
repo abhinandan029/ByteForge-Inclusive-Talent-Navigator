@@ -9,7 +9,7 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from mcp.server.fastmcp import FastMCP
-from utils.llm_provider import call_llm_extract, SKILLS_TAXONOMY
+from utils.skill_extractor import extract_skills
 
 
 # Initialize the MCP server scoped strictly to the skills domain
@@ -17,12 +17,12 @@ mcp = FastMCP("skills-server")
 
 
 @mcp.tool()
-def extract_skills(text: str) -> str:
+def extract_skills_tool(text: str, taxonomy_json: str) -> str:
     """
     Version: v1.1
 
     Extracts employee-attributable skills and supporting evidence
-    using the LLM extraction logic.
+    using deterministic rules and database-provided taxonomy.
 
     Read-only tool.
     """
@@ -30,24 +30,29 @@ def extract_skills(text: str) -> str:
     if not text or not text.strip():
         raise ValueError("Profile text cannot be empty.")
 
-    extraction_result = call_llm_extract(text)
+    try:
+        taxonomy_rows = json.loads(taxonomy_json)
+    except json.JSONDecodeError as exc:
+        raise ValueError("Invalid taxonomy JSON input.") from exc
+    if not isinstance(taxonomy_rows, list):
+        raise ValueError("Taxonomy input must be a JSON list.")
 
-    extracted_items = extraction_result.get("skills", [])
-
-    if not isinstance(extracted_items, list):
-        raise ValueError("Invalid skill extraction response.")
+    extracted_items = extract_skills(text, taxonomy_rows)
 
     return json.dumps({
         "schema_version": "1.1",
-        "tool": "extract_skills",
-        "mode": extraction_result.get("mode", "UNKNOWN"),
-        "is_fallback": extraction_result.get("is_fallback", True),
+        "tool": "extract_skills_tool",
+        "mode": "DATABASE_TAXONOMY_DETERMINISTIC",
+        "is_fallback": False,
         "extracted_items": extracted_items
     })
 
 
 @mcp.tool()
-def normalize_skills(raw_skills_json: str) -> str:
+def normalize_skills(
+    raw_skills_json: str,
+    taxonomy_json: str,
+) -> str:
     """
     Version: v1.1
 
@@ -73,6 +78,19 @@ def normalize_skills(raw_skills_json: str) -> str:
     if not isinstance(raw_items, list):
         raise ValueError("normalize_skills expects a JSON list.")
 
+    try:
+        taxonomy_rows = json.loads(taxonomy_json)
+    except json.JSONDecodeError as exc:
+        raise ValueError("Invalid taxonomy JSON input.") from exc
+
+    if not isinstance(taxonomy_rows, list):
+        raise ValueError("Taxonomy input must be a JSON list.")
+
+    taxonomy_by_id = {
+        str(row.get("skill_id")): row
+        for row in taxonomy_rows
+        if isinstance(row, dict)
+    }
     normalized_list = []
     seen_ids = set()
 
@@ -102,16 +120,15 @@ def normalize_skills(raw_skills_json: str) -> str:
         matched_code = None
 
         # Match against canonical names and taxonomy aliases.
-        for tax_id, meta in SKILLS_TAXONOMY.items():
-
-            canonical_name = meta["canonical_name"].lower()
+        for taxonomy_id, meta in taxonomy_by_id.items():
+            canonical_name = str(meta.get("canonical_name", "")).lower()
             aliases = [
-                alias.lower()
-                for alias in meta["aliases"]
+                str(alias).lower()
+                for alias in (meta.get("aliases") or [])
             ]
 
             if raw_name == canonical_name or raw_name in aliases:
-                matched_code = tax_id
+                matched_code = taxonomy_id
                 break
 
         if matched_code:
@@ -125,8 +142,8 @@ def normalize_skills(raw_skills_json: str) -> str:
 
             normalized_list.append({
                 "skill_id": matched_code,
-                "name": SKILLS_TAXONOMY[matched_code]["canonical_name"],
-                "taxonomy_category": SKILLS_TAXONOMY[matched_code]["category"],
+                "name": taxonomy_by_id[matched_code]["canonical_name"],
+                "taxonomy_category": taxonomy_by_id[matched_code]["category"],
                 "evidence_snippet": evidence,
                 "raw_extracted": raw_skill,
                 "taxonomy_mapped": True
