@@ -22,6 +22,7 @@ import {
 
 import { useAuth } from "../contexts/AuthContext";
 import DocumentManager from "../components/DocumentManager";
+import AgentRunPanel from "../components/AgentRunPanel";
 
 
 export default function SkillsPage() {
@@ -35,6 +36,7 @@ export default function SkillsPage() {
 
   const [loading, setLoading] = useState(true);
   const [extracting, setExtracting] = useState(false);
+  const [extractionStep, setExtractionStep] = useState(0);
   const [saving, setSaving] = useState(false);
 
   const [error, setError] = useState("");
@@ -47,6 +49,17 @@ export default function SkillsPage() {
 
   // Tracks additions/removals made by the employee.
   const [reviewChanged, setReviewChanged] = useState(false);
+
+  useEffect(() => {
+    if (!extracting) return undefined;
+
+    const timers = [
+      setTimeout(() => setExtractionStep(1), 700),
+      setTimeout(() => setExtractionStep(2), 1400),
+    ];
+
+    return () => timers.forEach(clearTimeout);
+  }, [extracting]);
 
 
   // =====================================================
@@ -161,6 +174,7 @@ export default function SkillsPage() {
 
     try {
       setExtracting(true);
+      setExtractionStep(0);
       setError("");
       setSuccess("");
 
@@ -169,6 +183,7 @@ export default function SkillsPage() {
         employee_id: employeeId,
       });
 
+      setExtractionStep(2);
       const extracted = data.extracted_skills || [];
 
       setExtractionSummary(
@@ -177,6 +192,7 @@ export default function SkillsPage() {
 
       // Reload the authoritative state from the database.
       const latestState = await refreshSkills();
+      setExtractionStep(3);
 
       const pendingCount =
         latestState.extracted_skills_draft?.length || 0;
@@ -193,6 +209,7 @@ export default function SkillsPage() {
       setError(err.message || "Skill extraction failed.");
     } finally {
       setExtracting(false);
+      setExtractionStep(0);
     }
   }
 
@@ -529,31 +546,50 @@ export default function SkillsPage() {
           />
         </div>
 
+        {extracting && (
+          <AgentRunPanel
+            agentName="Skills Discovery Agent"
+            task="Reading your profile, identifying evidence, and normalizing skills against the enterprise taxonomy."
+            steps={[
+              "Read profile",
+              "Extract skills",
+              "Normalize taxonomy",
+              "Save review draft",
+            ]}
+            activeStep={extractionStep}
+          />
+        )}
+
         {/* AI EXTRACTION */}
 
-        <section className="mb-6 rounded-2xl border border-indigo-100 bg-indigo-50/60 p-5">
+        <section className="mb-6 overflow-hidden rounded-2xl border border-indigo-200 bg-gradient-to-r from-indigo-700 via-indigo-600 to-purple-600 p-px shadow-sm shadow-indigo-200/50">
+          <div className="rounded-[0.95rem] bg-gradient-to-br from-indigo-50/95 via-white/95 to-purple-50/95 p-5 sm:p-6">
           <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
             <div className="flex gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-indigo-600">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-200">
                 <Sparkles size={22} />
               </div>
 
               <div>
-                <h3 className="font-semibold text-slate-900">
-                  AI Skills Extraction
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-indigo-600">
+                  Run agent
+                </p>
+                <h3 className="mt-1 text-lg font-bold text-slate-900">
+                  Skills Discovery Agent
                 </h3>
 
                 <p className="mt-1 text-sm text-slate-600">
-                  Extract skills from your uploaded documents.
-                  Review and edit the results before confirming.
+                  Analyze your uploaded documents, identify evidence, and
+                  prepare skills for your review.
                 </p>
               </div>
             </div>
 
             <button
+              type="button"
               onClick={handleExtractSkills}
               disabled={extracting || saving || reviewChanged}
-              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex min-h-14 shrink-0 items-center justify-center gap-3 rounded-2xl bg-indigo-700 px-6 py-3 text-sm font-bold text-white shadow-sm shadow-indigo-300 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {extracting ? (
                 <>
@@ -570,6 +606,12 @@ export default function SkillsPage() {
                 </>
               )}
             </button>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2 text-[11px] font-semibold text-indigo-700">
+            <span className="rounded-full bg-white px-3 py-1.5 shadow-sm">Evidence-based</span>
+            <span className="rounded-full bg-white px-3 py-1.5 shadow-sm">Taxonomy normalized</span>
+            <span className="rounded-full bg-white px-3 py-1.5 shadow-sm">Human reviewed</span>
+          </div>
           </div>
         </section>
 

@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { getLearningPathway } from "../services/learningApi";
 import { getMarketIntelligence } from "../services/marketApi";
+import AgentActionCard from "../components/AgentActionCard";
 
 export default function LearningPathPage() {
   const [activeTab, setActiveTab] = useState("pathway"); // "pathway" | "market"
@@ -28,6 +29,9 @@ export default function LearningPathPage() {
   const [market, setMarket] = useState(null);
   const [marketLoading, setMarketLoading] = useState(true);
   const [marketError, setMarketError] = useState("");
+
+  const pathwayRunning = pathwayLoading;
+  const marketRunning = marketLoading;
 
   async function loadPathway() {
     try {
@@ -90,7 +94,7 @@ export default function LearningPathPage() {
     <div className="min-h-full bg-slate-50 px-5 py-8 sm:px-8">
       <div className="mx-auto max-w-7xl">
         {/* HEADER */}
-        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div className="flex flex-col justify-between gap-5 border-b border-slate-200 pb-6 sm:flex-row sm:items-end">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
               Career Development & Market Intelligence
@@ -102,24 +106,47 @@ export default function LearningPathPage() {
               AI-recommended SAP Learning Hub courses to bridge skill gaps and real-time market demand signals.
             </p>
           </div>
+        </div>
 
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => {
-                loadPathway();
-                loadMarket();
-              }}
-              disabled={pathwayLoading || marketLoading}
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
-            >
-              <RefreshCw
-                size={15}
-                className={pathwayLoading || marketLoading ? "animate-spin" : ""}
-              />
-              Refresh Data
-            </button>
-          </div>
+        <div className="mt-6 grid gap-4 lg:grid-cols-2">
+          <AgentActionCard
+            eyebrow="Career development"
+            agentName="Learning Pathway Agent"
+            description="Map confirmed skill gaps to a practical SAP Learning Hub pathway."
+            badges={["Skill-gap mapping", "Course recommendations"]}
+            buttonLabel="Generate Pathway"
+            runningLabel="Generating..."
+            running={pathwayRunning}
+            onRun={loadPathway}
+          />
+          <AgentActionCard
+            eyebrow="Market intelligence"
+            agentName="Market Intelligence Agent"
+            description="Analyze active internal roles and demand signals for your confirmed skills."
+            badges={["Role demand", "Trend signals"]}
+            buttonLabel="Analyze Market"
+            runningLabel="Analyzing..."
+            running={marketRunning}
+            onRun={loadMarket}
+          />
+        </div>
+
+        <div className="mt-5 flex justify-end">
+          <button
+            type="button"
+            onClick={() => {
+              loadPathway();
+              loadMarket();
+            }}
+            disabled={pathwayLoading || marketLoading}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <RefreshCw
+              size={14}
+              className={pathwayLoading || marketLoading ? "animate-spin" : ""}
+            />
+            Refresh both agents
+          </button>
         </div>
 
         {/* TABS */}
