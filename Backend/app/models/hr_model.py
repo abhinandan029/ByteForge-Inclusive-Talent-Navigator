@@ -114,7 +114,10 @@ def get_hr_dashboard_counts():
             """,
             "total_matches": """
                 SELECT COUNT(*)
-                FROM matching_results
+                FROM matching_results mr
+                INNER JOIN job_roles jr
+                    ON jr.JOB_ROLE_ID = mr.JOB_ROLE_ID
+                   AND jr.STATUS = 'active'
             """,
             "pending_bias_reviews": """
                 SELECT COUNT(*)

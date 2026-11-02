@@ -16,6 +16,7 @@ def get_learning_session_record(employee_id: str) -> dict:
             FROM MATCHING_RESULTS mr
             INNER JOIN JOB_ROLES jr
                 ON jr.JOB_ROLE_ID = mr.JOB_ROLE_ID
+                AND jr.STATUS = 'active'
             WHERE mr.EMPLOYEE_ID = ?
             ORDER BY mr.MATCH_SCORE DESC
             """,

@@ -7,6 +7,7 @@ async function request(endpoint, options = {}) {
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
     credentials: "include",
+    cache: "no-store",
     headers: {
       "Content-Type": "application/json",
       ...options.headers,
@@ -47,4 +48,3 @@ export async function getMatchingDetails(matchId) {
   if (!matchId) throw new Error("Match ID is required.");
   return request(`/results/${encodeURIComponent(matchId)}`);
 }
-

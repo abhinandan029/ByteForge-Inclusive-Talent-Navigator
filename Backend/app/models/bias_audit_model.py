@@ -152,6 +152,7 @@ def get_bias_audit_inputs(
                 ON e.EMPLOYEE_ID = mr.EMPLOYEE_ID
             INNER JOIN JOB_ROLES jr
                 ON jr.JOB_ROLE_ID = mr.JOB_ROLE_ID
+                AND jr.STATUS = 'active'
         """
 
         conditions = []
@@ -272,8 +273,8 @@ def get_bias_audit_inputs(
             FROM JOB_ROLES
         """
 
-        role_conditions = []
-        role_params = []
+        role_conditions = ["STATUS = ?"]
+        role_params = ["active"]
 
         if job_role_ids is not None:
             if not job_role_ids:
@@ -298,10 +299,6 @@ def get_bias_audit_inputs(
                 f"JOB_ROLE_ID IN ({placeholders})"
             )
             role_params.extend(values)
-
-        else:
-            role_conditions.append("STATUS = ?")
-            role_params.append("active")
 
         if role_conditions:
             role_query += (

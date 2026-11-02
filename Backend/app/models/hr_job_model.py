@@ -423,6 +423,42 @@ def update_job_role_status(job_role_id: str, new_status: str, hr_id: str):
             conn.rollback()
             return "predefined"
 
+        if new_status == "inactive":
+            cursor.execute(
+                """
+                SELECT MATCH_ID
+                FROM MATCHING_RESULTS
+                WHERE JOB_ROLE_ID = ?
+                """,
+                (job_role_id,)
+            )
+            match_ids = [row[0] for row in cursor.fetchall()]
+
+            cursor.execute(
+                """
+                DELETE FROM BIAS_AUDIT_FLAGS
+                WHERE JOB_ROLE_ID = ?
+                """,
+                (job_role_id,)
+            )
+
+            if match_ids:
+                placeholders = ", ".join("?" for _ in match_ids)
+                cursor.execute(
+                    f"""
+                    DELETE FROM HR_REVIEW_DECISIONS
+                    WHERE MATCH_ID IN ({placeholders})
+                    """,
+                    match_ids
+                )
+                cursor.execute(
+                    f"""
+                    DELETE FROM MATCHING_RESULTS
+                    WHERE MATCH_ID IN ({placeholders})
+                    """,
+                    match_ids
+                )
+
         insert_hr_audit_log(
             cursor=cursor,
             hr_id=hr_id,

@@ -542,6 +542,7 @@ _MATCH_SELECT = """
         ON e.EMPLOYEE_ID = mr.EMPLOYEE_ID
     INNER JOIN JOB_ROLES jr
         ON jr.JOB_ROLE_ID = mr.JOB_ROLE_ID
+        AND jr.STATUS = 'active'
 """
 
 
