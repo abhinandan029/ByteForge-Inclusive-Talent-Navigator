@@ -4,12 +4,10 @@ import {
   RefreshCw,
   Search,
   Clock,
-  Briefcase,
   AlertCircle,
-  FileText,
-  User,
 } from "lucide-react";
 import { getHRAuditLogs } from "../services/jobsApi";
+import AuditDetailsViewer from "../components/AuditDetailsViewer";
 
 export default function HRAuditLog() {
   const [logs, setLogs] = useState([]);
@@ -33,19 +31,6 @@ export default function HRAuditLog() {
   useEffect(() => {
     loadLogs();
   }, []);
-
-  function formatDetails(details) {
-    if (!details) return "—";
-    if (typeof details === "object") {
-      return JSON.stringify(details, null, 2);
-    }
-    try {
-      const parsed = JSON.parse(details);
-      return JSON.stringify(parsed, null, 2);
-    } catch {
-      return details;
-    }
-  }
 
   const filteredLogs = logs.filter((log) => {
     const action = log.ACTION || log.action || "";
@@ -162,10 +147,8 @@ export default function HRAuditLog() {
                           {roleId || "—"}
                         </td>
 
-                        <td className="px-6 py-4 max-w-md">
-                          <pre className="max-h-24 overflow-y-auto rounded-lg bg-slate-50 p-2 text-[10px] text-slate-700 font-mono border border-slate-100">
-                            {formatDetails(details)}
-                          </pre>
+                        <td className="px-6 py-4 min-w-[320px] max-w-lg">
+                          <AuditDetailsViewer details={details} />
                         </td>
                       </tr>
                     );
