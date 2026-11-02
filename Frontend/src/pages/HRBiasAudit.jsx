@@ -1,5 +1,6 @@
 
 import { useEffect, useState } from "react";
+import { X } from "lucide-react";
 
 import {
   getBiasFlags,
@@ -555,38 +556,44 @@ function HRBiasAudit() {
       {/* Three-stage wizard modal */}
       {selectedFlag && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 md:p-6"
+          className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/40 p-4 backdrop-blur-sm"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) {
               closeModal();
             }
           }}
         >
-          <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="bias-review-title"
+            className="my-8 flex max-h-[calc(100vh-4rem)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl"
+          >
             {/* Modal header */}
-            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-5">
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
               <div>
-                <h2 className="text-xl font-bold text-gray-900">
+                <h2 id="bias-review-title" className="text-lg font-bold text-slate-900">
                   Bias Flag Review
                 </h2>
 
-                <p className="mt-1 text-sm text-gray-500">
+                <p className="mt-1 text-xs text-slate-500">
                   Complete all three stages to finalize your decision.
                 </p>
               </div>
 
               <button
+                type="button"
                 onClick={() => closeModal()}
                 disabled={savingReview || savingDecision}
-                className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
+                className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
                 aria-label="Close modal"
               >
-                ✕
+                <X size={20} />
               </button>
             </div>
 
             {/* Stage indicator */}
-            <div className="flex justify-center border-b border-gray-200 px-6 py-5">
+            <div className="flex justify-center border-b border-slate-100 px-6 py-4">
               <div className="flex w-full max-w-md items-center justify-center">
                 {stages.map((stage, index) => (
                   <div
@@ -598,7 +605,7 @@ function HRBiasAudit() {
                         className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold ${
                           currentStage >= stage.number
                             ? "bg-indigo-600 text-white"
-                            : "bg-gray-200 text-gray-500"
+                            : "bg-slate-100 text-slate-500"
                         }`}
                       >
                         {stage.number}
@@ -608,7 +615,7 @@ function HRBiasAudit() {
                         className={`mt-2 whitespace-nowrap text-xs font-medium ${
                           currentStage === stage.number
                             ? "text-indigo-700"
-                            : "text-gray-500"
+                            : "text-slate-500"
                         }`}
                       >
                         {stage.label}
@@ -620,7 +627,7 @@ function HRBiasAudit() {
                         className={`mx-3 mb-5 h-1 flex-1 rounded ${
                           currentStage > stage.number
                             ? "bg-indigo-600"
-                            : "bg-gray-200"
+                            : "bg-slate-200"
                         }`}
                       />
                     )}
@@ -630,9 +637,9 @@ function HRBiasAudit() {
             </div>
 
             {/* Modal content */}
-            <div className="flex-1 overflow-y-auto px-6 py-6">
+            <div className="flex-1 overflow-y-auto px-6 py-5">
               {error && (
-                <div className="mb-5 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                <div className="mb-5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
                   {error}
                 </div>
               )}
@@ -641,56 +648,56 @@ function HRBiasAudit() {
               {currentStage === 1 && (
                 <div className="space-y-5">
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900">
+                    <h3 className="text-base font-bold text-slate-900">
                       Stage 1: Bias Flag Details
                     </h3>
 
-                    <p className="mt-1 text-sm text-gray-500">
+                    <p className="mt-1 text-xs text-slate-500">
                       Examine the employee, job role, and AI-generated flag.
                     </p>
                   </div>
 
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div className="rounded-lg bg-gray-50 p-4">
-                      <p className="text-xs font-medium uppercase text-gray-500">
+                    <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
                         Employee
                       </p>
 
-                      <p className="mt-2 font-semibold text-gray-900">
+                      <p className="mt-2 text-sm font-semibold text-slate-900">
                         {selectedFlag.employee_name || "N/A"}
                       </p>
 
-                      <p className="mt-1 text-xs text-gray-500">
+                      <p className="mt-1 text-xs text-slate-500">
                         ID: {selectedFlag.employee_id || "N/A"}
                       </p>
                     </div>
 
-                    <div className="rounded-lg bg-gray-50 p-4">
-                      <p className="text-xs font-medium uppercase text-gray-500">
+                    <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
                         Job Role
                       </p>
 
-                      <p className="mt-2 font-semibold text-gray-900">
+                      <p className="mt-2 text-sm font-semibold text-slate-900">
                         {selectedFlag.job_title || "N/A"}
                       </p>
 
-                      <p className="mt-1 text-xs text-gray-500">
+                      <p className="mt-1 text-xs text-slate-500">
                         Role ID: {selectedFlag.job_role_id || "N/A"}
                       </p>
                     </div>
 
-                    <div className="rounded-lg bg-gray-50 p-4">
-                      <p className="text-xs font-medium uppercase text-gray-500">
+                    <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
                         Flag Type
                       </p>
 
-                      <p className="mt-2 font-semibold text-gray-900">
+                      <p className="mt-2 text-sm font-semibold text-slate-900">
                         {formatLabel(selectedFlag.flag_type)}
                       </p>
                     </div>
 
-                    <div className="rounded-lg bg-gray-50 p-4">
-                      <p className="text-xs font-medium uppercase text-gray-500">
+                    <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
                         Severity
                       </p>
 
@@ -703,12 +710,12 @@ function HRBiasAudit() {
                       </span>
                     </div>
 
-                    <div className="rounded-lg bg-gray-50 p-4 sm:col-span-2">
-                      <p className="text-xs font-medium uppercase text-gray-500">
+                    <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 sm:col-span-2">
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
                         Match Score
                       </p>
 
-                      <p className="mt-2 font-semibold text-gray-900">
+                      <p className="mt-2 text-sm font-semibold text-slate-900">
                         {selectedFlag.match_score ?? "N/A"}
                         {selectedFlag.match_score != null ? "%" : ""}
                       </p>
@@ -716,27 +723,27 @@ function HRBiasAudit() {
                   </div>
 
                   <div>
-                    <h4 className="mb-2 text-sm font-semibold text-gray-800">
+                    <h4 className="mb-2 text-xs font-bold text-slate-700">
                       Flag Description
                     </h4>
 
-                    <div className="rounded-lg border border-gray-200 p-4 text-sm leading-6 text-gray-700">
+                    <div className="rounded-xl border border-slate-200 p-4 text-xs leading-6 text-slate-700">
                       {selectedFlag.description || "No description provided."}
                     </div>
                   </div>
 
                   <div>
-                    <h4 className="mb-2 text-sm font-semibold text-gray-800">
+                    <h4 className="mb-2 text-xs font-bold text-slate-700">
                       AI Recommendation
                     </h4>
 
-                    <div className="rounded-lg border border-indigo-100 bg-indigo-50 p-4 text-sm leading-6 text-indigo-900">
+                    <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-4 text-xs leading-6 text-indigo-900">
                       {selectedFlag.recommendation ||
                         "No recommendation provided."}
                     </div>
                   </div>
 
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-slate-500">
                     AI-generated flags are advisory. The final candidate
                     decision must be made by HR.
                   </p>
@@ -747,11 +754,11 @@ function HRBiasAudit() {
               {currentStage === 2 && (
                 <div className="space-y-5">
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900">
+                    <h3 className="text-base font-bold text-slate-900">
                       Stage 2: HR Review
                     </h3>
 
-                    <p className="mt-1 text-sm text-gray-500">
+                    <p className="mt-1 text-xs text-slate-500">
                       Decide whether the identified flag is a genuine concern.
                     </p>
                   </div>
@@ -761,7 +768,7 @@ function HRBiasAudit() {
                       className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 ${
                         reviewStatus === "concerning"
                           ? "border-red-400 bg-red-50"
-                          : "border-gray-200 hover:bg-gray-50"
+                          : "border-slate-200 hover:bg-slate-50"
                       }`}
                     >
                       <input
@@ -776,11 +783,11 @@ function HRBiasAudit() {
                       />
 
                       <div>
-                        <p className="font-semibold text-gray-900">
+                        <p className="text-sm font-semibold text-slate-900">
                           Concerning
                         </p>
 
-                        <p className="mt-1 text-sm text-gray-600">
+                        <p className="mt-1 text-xs text-slate-600">
                           The flag represents a genuine concern that requires
                           attention.
                         </p>
@@ -791,7 +798,7 @@ function HRBiasAudit() {
                       className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 ${
                         reviewStatus === "not_concerning"
                           ? "border-green-400 bg-green-50"
-                          : "border-gray-200 hover:bg-gray-50"
+                          : "border-slate-200 hover:bg-slate-50"
                       }`}
                     >
                       <input
@@ -806,11 +813,11 @@ function HRBiasAudit() {
                       />
 
                       <div>
-                        <p className="font-semibold text-gray-900">
+                        <p className="text-sm font-semibold text-slate-900">
                           Not Concerning
                         </p>
 
-                        <p className="mt-1 text-sm text-gray-600">
+                        <p className="mt-1 text-xs text-slate-600">
                           The flag does not represent a genuine concern.
                         </p>
                       </div>
@@ -818,7 +825,7 @@ function HRBiasAudit() {
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-semibold text-gray-800">
+                    <label className="mb-2 block text-xs font-bold text-slate-700">
                       HR Review Comments
                     </label>
 
@@ -829,7 +836,7 @@ function HRBiasAudit() {
                         setReviewComments(event.target.value)
                       }
                       placeholder="Explain your assessment..."
-                      className="w-full rounded-lg border border-gray-300 p-3 text-sm outline-none focus:border-indigo-500"
+                      className="w-full rounded-xl border border-slate-200 p-2.5 text-xs outline-none focus:border-indigo-500"
                     />
                   </div>
                 </div>
@@ -843,51 +850,51 @@ function HRBiasAudit() {
                   className="space-y-5"
                 >
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900">
+                    <h3 className="text-base font-bold text-slate-900">
                       Stage 3: Final Candidate Decision
                     </h3>
 
-                    <p className="mt-1 text-sm text-gray-500">
+                    <p className="mt-1 text-xs text-slate-500">
                       Make the final decision for this candidate.
                     </p>
                   </div>
 
                   {existingDecision?.decision && (
-                    <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
-                      <p className="text-xs font-semibold uppercase text-blue-700">
+                    <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-blue-700">
                         Previously Submitted Decision
                       </p>
 
-                      <p className="mt-2 font-semibold text-blue-900">
+                      <p className="mt-2 text-sm font-semibold text-blue-900">
                         {formatLabel(existingDecision.decision)}
                       </p>
 
                       {existingDecision.comments && (
-                        <p className="mt-1 text-sm text-blue-800">
+                        <p className="mt-1 text-xs text-blue-800">
                           {existingDecision.comments}
                         </p>
                       )}
                     </div>
                   )}
 
-                  <div className="rounded-lg bg-gray-50 p-4">
-                    <p className="text-xs font-medium uppercase text-gray-500">
+                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
                       HR Review Result
                     </p>
 
-                    <p className="mt-2 font-semibold text-gray-900">
+                    <p className="mt-2 text-sm font-semibold text-slate-900">
                       {formatLabel(reviewStatus || selectedFlag.review_status)}
                     </p>
 
                     {reviewComments && (
-                      <p className="mt-2 text-sm text-gray-600">
+                      <p className="mt-2 text-xs text-slate-600">
                         {reviewComments}
                       </p>
                     )}
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-semibold text-gray-800">
+                    <label className="mb-2 block text-xs font-bold text-slate-700">
                       Final Decision
                     </label>
 
@@ -895,10 +902,10 @@ function HRBiasAudit() {
                       {decisionOptions.map((option) => (
                         <label
                           key={option.value}
-                          className={`flex cursor-pointer items-center gap-3 rounded-lg border p-4 ${
+                          className={`flex cursor-pointer items-center gap-3 rounded-xl border p-4 ${
                             decision === option.value
                               ? "border-indigo-500 bg-indigo-50"
-                              : "border-gray-200 hover:bg-gray-50"
+                              : "border-slate-200 hover:bg-slate-50"
                           }`}
                         >
                           <input
@@ -911,7 +918,7 @@ function HRBiasAudit() {
                             }
                           />
 
-                          <span className="text-sm font-medium text-gray-800">
+                          <span className="text-xs font-semibold text-slate-700">
                             {option.label}
                           </span>
                         </label>
@@ -921,7 +928,7 @@ function HRBiasAudit() {
 
                   {decision === "reject" && (
                     <div>
-                      <label className="mb-2 block text-sm font-semibold text-gray-800">
+                      <label className="mb-2 block text-xs font-bold text-slate-700">
                         Override Reason <span className="text-red-500">*</span>
                       </label>
 
@@ -933,13 +940,13 @@ function HRBiasAudit() {
                         }
                         required
                         placeholder="Explain why this candidate is being rejected..."
-                        className="w-full rounded-lg border border-gray-300 p-3 text-sm outline-none focus:border-indigo-500"
+                        className="w-full rounded-xl border border-slate-200 p-2.5 text-xs outline-none focus:border-indigo-500"
                       />
                     </div>
                   )}
 
                   <div>
-                    <label className="mb-2 block text-sm font-semibold text-gray-800">
+                    <label className="mb-2 block text-xs font-bold text-slate-700">
                       Decision Comments
                     </label>
 
@@ -950,7 +957,7 @@ function HRBiasAudit() {
                         setDecisionComments(event.target.value)
                       }
                       placeholder="Add any additional comments..."
-                      className="w-full rounded-lg border border-gray-300 p-3 text-sm outline-none focus:border-indigo-500"
+                      className="w-full rounded-xl border border-slate-200 p-2.5 text-xs outline-none focus:border-indigo-500"
                     />
                   </div>
                 </form>
@@ -958,12 +965,12 @@ function HRBiasAudit() {
             </div>
 
             {/* Modal footer */}
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-white px-6 py-4">
               <button
                 type="button"
                 onClick={goToPreviousStage}
                 disabled={currentStage === 1 || savingReview || savingDecision}
-                className="rounded-lg border border-gray-300 px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+                className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Back
               </button>
@@ -977,7 +984,7 @@ function HRBiasAudit() {
                       : handleReviewSubmit
                   }
                   disabled={savingReview || savingDecision}
-                  className="rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+                  className="rounded-xl bg-slate-900 px-5 py-2 text-xs font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
                 >
                   {savingReview
                     ? "Saving Review..."
@@ -990,7 +997,7 @@ function HRBiasAudit() {
                   type="submit"
                   form="finalDecisionForm"
                   disabled={savingDecision || savingReview}
-                  className="rounded-lg bg-green-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50"
+                  className="rounded-xl bg-slate-900 px-5 py-2 text-xs font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
                 >
                   {savingDecision ? "Submitting..." : "Submit Final Decision"}
                 </button>
