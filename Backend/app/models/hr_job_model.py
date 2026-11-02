@@ -70,10 +70,58 @@ def get_all_job_roles():
             for column in cursor.description
         ]
 
-        return [
+        roles = [
             dict(zip(columns, row))
             for row in cursor.fetchall()
         ]
+
+        if not roles:
+            return roles
+
+        placeholders = ", ".join("?" for _ in roles)
+        role_ids = [role["job_role_id"] for role in roles]
+
+        cursor.execute(
+            f"""
+            SELECT
+                JOB_ROLE_ID,
+                REQUIREMENT_ID,
+                SKILL_NAME,
+                TAXONOMY_CATEGORY,
+                REQUIRED_PROFICIENCY,
+                IS_MANDATORY,
+                WEIGHT
+            FROM JOB_REQUIRED_SKILLS
+            WHERE JOB_ROLE_ID IN ({placeholders})
+            ORDER BY JOB_ROLE_ID, SKILL_NAME
+            """,
+            role_ids
+        )
+
+        skill_columns = [
+            column[0].lower()
+            for column in cursor.description
+        ]
+        skills_by_role = {}
+
+        for row in cursor.fetchall():
+            skill = dict(zip(skill_columns, row))
+            skills_by_role.setdefault(
+                skill["job_role_id"],
+                []
+            ).append({
+                key: value
+                for key, value in skill.items()
+                if key != "job_role_id"
+            })
+
+        for role in roles:
+            role["required_skills"] = skills_by_role.get(
+                role["job_role_id"],
+                []
+            )
+
+        return roles
 
     finally:
         if cursor:
@@ -434,6 +482,73 @@ def add_required_skills(job_role_id: str, skills: list[dict], hr_id: str):
             entity_type="JOB_ROLE",
             entity_id=job_role_id,
             details=f"Added {len(skills)} required skill(s)"
+        )
+
+        conn.commit()
+        return True
+
+    except Exception:
+        if conn:
+            conn.rollback()
+        raise
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            release_connection(conn)
+
+
+def delete_required_skill(
+    job_role_id: str,
+    requirement_id: str,
+    hr_id: str,
+):
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT SKILL_NAME
+            FROM JOB_REQUIRED_SKILLS
+            WHERE JOB_ROLE_ID = ?
+              AND REQUIREMENT_ID = ?
+            """,
+            (job_role_id, requirement_id)
+        )
+        row = cursor.fetchone()
+
+        if not row:
+            conn.rollback()
+            return False
+
+        skill_name = (
+            row.get("SKILL_NAME") or row.get("skill_name")
+            if isinstance(row, dict)
+            else row[0]
+        )
+
+        cursor.execute(
+            """
+            DELETE FROM JOB_REQUIRED_SKILLS
+            WHERE JOB_ROLE_ID = ?
+              AND REQUIREMENT_ID = ?
+            """,
+            (job_role_id, requirement_id)
+        )
+
+        insert_hr_audit_log(
+            cursor=cursor,
+            hr_id=hr_id,
+            action="JOB_SKILL_REMOVED",
+            entity_type="JOB_ROLE",
+            entity_id=job_role_id,
+            details=f"Removed required skill: {skill_name}"
         )
 
         conn.commit()

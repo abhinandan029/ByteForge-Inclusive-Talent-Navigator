@@ -14,6 +14,7 @@ from app.controllers.hr_job_controller import (
     edit_job_role,
     change_job_role_status,
     add_skills_to_job_role,
+    remove_skill_from_job_role,
     get_hr_activity
 )
 
@@ -176,6 +177,30 @@ def add_role_skills(
 
     return {
         "message": "Required skills added successfully",
+        "job_role": role
+    }
+
+
+@router.delete("/{job_role_id}/skills/{requirement_id}")
+def remove_role_skill(
+    job_role_id: str,
+    requirement_id: str,
+    hr: dict = Depends(get_current_hr)
+):
+    role = remove_skill_from_job_role(
+        job_role_id,
+        requirement_id,
+        hr["hr_id"]
+    )
+
+    if not role:
+        raise HTTPException(
+            status_code=404,
+            detail="Required skill not found for this job role"
+        )
+
+    return {
+        "message": "Required skill removed successfully",
         "job_role": role
     }
 

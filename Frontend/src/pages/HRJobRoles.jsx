@@ -7,6 +7,7 @@ import {
   RefreshCw,
   Edit2,
   Power,
+  X,
 } from "lucide-react";
 import {
   getJobRoles,
@@ -14,6 +15,7 @@ import {
   updateJobRole,
   updateJobRoleStatus,
   addSkillsToJobRole,
+  removeSkillFromJobRole,
 } from "../services/jobsApi";
 
 const initialSkill = {
@@ -61,6 +63,7 @@ export default function HRJobRoles() {
   // Add skill modal state
   const [addSkillRole, setAddSkillRole] = useState(null);
   const [newSkillsList, setNewSkillsList] = useState([{ ...initialSkill }]);
+  const [removingSkillId, setRemovingSkillId] = useState(null);
 
   async function loadRoles() {
     try {
@@ -262,6 +265,35 @@ export default function HRJobRoles() {
       setError(err.message || "Failed to add skills.");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleRemoveSkill(role, skill) {
+    const roleId = role.job_role_id || role.JOB_ROLE_ID;
+    const requirementId = skill.requirement_id || skill.REQUIREMENT_ID;
+    const skillName = skill.skill_name || skill.SKILL_NAME || skill.name;
+
+    if (!requirementId) {
+      setError("Cannot remove this skill because its requirement ID is missing.");
+      return;
+    }
+
+    if (!confirm(`Remove "${skillName}" from this job role?`)) {
+      return;
+    }
+
+    try {
+      setRemovingSkillId(requirementId);
+      setError("");
+      setSuccess("");
+
+      await removeSkillFromJobRole(roleId, requirementId);
+      setSuccess(`Removed "${skillName}" from the job role.`);
+      await loadRoles();
+    } catch (err) {
+      setError(err.message || "Failed to remove the required skill.");
+    } finally {
+      setRemovingSkillId(null);
     }
   }
 
@@ -504,6 +536,8 @@ export default function HRJobRoles() {
                           const sName = skill.skill_name || skill.SKILL_NAME || skill.name;
                           const sMandatory = skill.is_mandatory ?? skill.IS_MANDATORY ?? true;
                           const sWeight = skill.weight ?? skill.WEIGHT ?? 1.0;
+                          const requirementId = skill.requirement_id || skill.REQUIREMENT_ID;
+                          const isRemoving = removingSkillId === requirementId;
 
                           return (
                             <span
@@ -523,6 +557,16 @@ export default function HRJobRoles() {
                                   req
                                 </span>
                               )}
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveSkill(role, skill)}
+                                disabled={!requirementId || isRemoving || removingSkillId !== null}
+                                aria-label={`Remove ${sName} from ${title}`}
+                                title={`Remove ${sName}`}
+                                className="ml-0.5 rounded p-0.5 text-slate-400 hover:bg-red-100 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                <X size={12} />
+                              </button>
                             </span>
                           );
                         })
