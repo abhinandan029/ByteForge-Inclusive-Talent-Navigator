@@ -39,6 +39,12 @@ Push-Location .\Backend
 Pop-Location
 ```
 
+Provision an employee account from the repository root:
+
+```powershell
+& .\Backend\.venv\Scripts\python.exe .\Backend\scripts\provision_employee.py
+```
+
 ## Change checklist
 
 - Read the relevant route, controller, model, agent, and MCP server first.
