@@ -1,5 +1,7 @@
 
 import re
+import os
+import shutil
 from io import BytesIO
 
 from pypdf import PdfReader
@@ -22,7 +24,53 @@ def sanitize_extracted_text(text: str) -> str:
         text
     )
 
+    text = re.sub(r"[ \t]+", " ", text)
+    text = re.sub(r"(?<=\w)-\n(?=\w)", "", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+
     return text.strip()
+
+
+def _extract_text_from_scanned_pdf(file_content: bytes) -> str:
+    """Run OCR when a PDF has no embedded text layer."""
+    try:
+        import fitz
+        import pytesseract
+        from PIL import Image
+    except ImportError as exc:
+        raise RuntimeError(
+            "This PDF contains no readable text layer. OCR requires "
+            "PyMuPDF, Pillow, pytesseract, and the Tesseract executable."
+        ) from exc
+
+    tesseract_cmd = os.getenv("TESSERACT_CMD")
+    if tesseract_cmd:
+        pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
+    elif not shutil.which("tesseract"):
+        raise RuntimeError(
+            "This PDF contains no readable text layer. Install Tesseract "
+            "OCR and add its executable to PATH or set TESSERACT_CMD."
+        )
+
+    extracted_pages = []
+    document = fitz.open(stream=file_content, filetype="pdf")
+
+    try:
+        for page in document:
+            pixmap = page.get_pixmap(
+                matrix=fitz.Matrix(2, 2),
+                alpha=False
+            )
+            image = Image.open(BytesIO(pixmap.tobytes("png")))
+            page_text = pytesseract.image_to_string(image)
+            page_text = sanitize_extracted_text(page_text)
+
+            if page_text:
+                extracted_pages.append(page_text)
+    finally:
+        document.close()
+
+    return "\n\n".join(extracted_pages).strip()
 
 
 def extract_text_from_pdf(file_content: bytes) -> str:
@@ -40,7 +88,11 @@ def extract_text_from_pdf(file_content: bytes) -> str:
             if page_text:
                 extracted_pages.append(page_text)
 
-    return "\n\n".join(extracted_pages).strip()
+    text = "\n\n".join(extracted_pages).strip()
+    if text:
+        return text
+
+    return _extract_text_from_scanned_pdf(file_content)
 
 
 def extract_text_from_docx(file_content: bytes) -> str:
