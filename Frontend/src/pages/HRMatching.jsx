@@ -341,6 +341,7 @@ export default function HRMatching() {
               const missingSkills = match.missing_skills || [];
               const expWarning = match.experience_warning || match.EXPERIENCE_WARNING;
               const explanation = match.match_explanation || match.MATCH_EXPLANATION;
+              const breakdown = match.score_breakdown || {};
 
               const pct = Math.min(100, Math.max(0, Math.round(score)));
 
@@ -414,6 +415,27 @@ export default function HRMatching() {
                   )}
 
                   {/* SKILLS BREAKDOWN */}
+                  <div className="mt-4 grid grid-cols-2 gap-2 border-t border-slate-100 pt-4 sm:grid-cols-4">
+                    {[
+                      ["Skill coverage", breakdown.skill_coverage],
+                      ["Evidence strength", breakdown.evidence_strength],
+                      ["Learning progress", breakdown.learning_progress],
+                      ["Experience fit", breakdown.experience_fit],
+                    ].map(([label, value]) => (
+                      <div key={label} className="rounded-lg bg-slate-50 p-2.5">
+                        <div className="flex justify-between gap-2 text-[10px] font-semibold text-slate-500">
+                          <span>{label}</span>
+                          <span>{value == null ? "—" : `${Math.round(value)}%`}</span>
+                        </div>
+                        <div className="mt-1 h-1.5 rounded-full bg-slate-200">
+                          <div
+                            className="h-1.5 rounded-full bg-indigo-500"
+                            style={{ width: `${Math.min(100, Math.max(0, Number(value || 0)))}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                   <div className="mt-4 grid gap-3 sm:grid-cols-2 pt-4 border-t border-slate-100 text-xs">
                     <div>
                       <span className="font-semibold text-emerald-800 text-[11px] uppercase tracking-wider">
@@ -429,6 +451,7 @@ export default function HRMatching() {
                               className="rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-800"
                             >
                               {s.skill_name || s.name}
+                              {s.inferred_proficiency ? ` · ${s.inferred_proficiency}` : ""}
                             </span>
                           ))
                         )}

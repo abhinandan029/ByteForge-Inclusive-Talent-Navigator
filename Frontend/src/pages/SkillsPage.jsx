@@ -935,6 +935,9 @@ export default function SkillsPage() {
                   className="rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm text-emerald-800"
                 >
                   {skill.name}
+                  {skill.inferred_proficiency
+                    ? ` · ${skill.inferred_proficiency}`
+                    : ""}
 
                   <span className="ml-2 text-xs opacity-60">
                     {skill.taxonomy_category}
