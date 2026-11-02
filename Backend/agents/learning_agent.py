@@ -1,11 +1,12 @@
 # Backend/agents/learning_agent.py
 import json
+import asyncio
 from pathlib import Path
+import sys
 from typing import List, Dict, Any
 from pydantic import BaseModel
-from utils.audit_logger import log_audit_event
-
-COURSES_FILE = Path(__file__).resolve().parent.parent / "data" / "courses.json"
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
 
 class CourseRecommendation(BaseModel):
     course_id: str
@@ -22,64 +23,45 @@ class LearningPathwayResponse(BaseModel):
     recommended_courses: List[CourseRecommendation]
     pathway_summary: str
 
-def run_learning_pathway(employee_id: str, session_record: Dict[str, Any]) -> LearningPathwayResponse:
-    """
-    F6: Learning Pathway Agent. Identifies skill gaps for a target role
-    and suggests courses with direct SAP Learning Hub URL links.
-    """
-    try:
-        with open(COURSES_FILE, "r", encoding="utf-8") as f:
-            courses_data = json.load(f)
-    except FileNotFoundError:
-        courses_data = []
-
-    # Pull skill gaps from the top matched role stored in SESSION_STORE
-    role_matches = session_record.get("role_matches", {}).get("recommended_roles", [])
-    target_role_title = "AI & Backend Solutions Engineer (SAP BTP)"
-    skill_gaps = ["SAP BTP", "Cloud Foundry", "Machine Learning"]
-
-    if role_matches:
-        top_role = role_matches[0]
-        target_role_title = top_role.get("title", target_role_title)
-        missing = top_role.get("missing_skills", [])
-        if missing:
-            skill_gaps = missing
-
-    recommended_courses: List[CourseRecommendation] = []
-    matched_gaps = set()
-
-    for course in courses_data:
-        if course["target_skill"] in skill_gaps or len(recommended_courses) < 4:
-            if course["course_id"] not in [c.course_id for c in recommended_courses]:
-                recommended_courses.append(
-                    CourseRecommendation(
-                        course_id=course["course_id"],
-                        title=course["title"],
-                        target_skill=course["target_skill"],
-                        duration=course["duration"],
-                        sap_learning_hub_url=course["sap_learning_hub_url"]
-                    )
-                )
-                matched_gaps.add(course["target_skill"])
-
-    summary = (
-        f"Generated targeted learning pathway for '{target_role_title}' addressing "
-        f"skill gaps in {', '.join(list(matched_gaps) or skill_gaps)}. "
-        f"All courses include direct SAP Learning Hub links."
+async def _run_learning_mcp(
+    employee_id: str,
+    session_record: Dict[str, Any],
+) -> LearningPathwayResponse:
+    server_script = (
+        Path(__file__).resolve().parents[1]
+        / "mcp_server"
+        / "learning_mcp_server.py"
+    )
+    params = StdioServerParameters(
+        command=sys.executable,
+        args=[str(server_script)],
+        env=None,
     )
 
-    log_audit_event(
-        session_id=employee_id,
-        actor="Learning Pathway Agent",
-        action="generate_learning_pathway",
-        input_summary=f"Target role: {target_role_title}, Gaps: {skill_gaps}",
-        output_summary=f"Recommended {len(recommended_courses)} SAP Learning Hub courses"
-    )
+    async with stdio_client(params) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            response = await session.call_tool(
+                "generate_learning_pathway",
+                arguments={
+                    "employee_id": employee_id,
+                    "session_record_json": json.dumps(session_record),
+                },
+            )
 
-    return LearningPathwayResponse(
-        employee_id=employee_id,
-        target_role=target_role_title,
-        skill_gaps_addressed=list(matched_gaps) or skill_gaps,
-        recommended_courses=recommended_courses,
-        pathway_summary=summary
-    )
+            if response.isError or not response.content:
+                raise RuntimeError("MCP learning pathway tool failed.")
+
+            payload = json.loads(response.content[0].text)
+            if not isinstance(payload, dict):
+                raise ValueError("MCP learning pathway returned invalid data.")
+
+            return LearningPathwayResponse.model_validate(payload)
+
+
+def run_learning_pathway(
+    employee_id: str,
+    session_record: Dict[str, Any],
+) -> LearningPathwayResponse:
+    """Run Career Development through the Learning MCP server."""
+    return asyncio.run(_run_learning_mcp(employee_id, session_record))

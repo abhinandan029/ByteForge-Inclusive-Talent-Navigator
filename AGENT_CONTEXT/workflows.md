@@ -43,9 +43,21 @@ assume that related technologies are interchangeable.
 Bias flags are review indicators, not automated findings of discrimination.
 HR remains responsible for reviewing flags and recording decisions.
 
-## Market and Career Development
+## Market Intelligence
 
-`agents/market_agent.py` and `agents/learning_agent.py` contain domain
-implementations, but they are not currently wired into FastAPI routes. Any
-future integration must follow the same MCP boundary and model/controller
-ownership rules instead of calling them directly from routes.
+1. An authenticated employee calls `GET /api/market/intelligence`.
+2. The market model fetches confirmed skills.
+3. `run_market_intelligence` starts `market_mcp_server.py` over stdio.
+4. The MCP tool matches skills against the simulated market-demand dataset.
+5. The model records the central audit event and the controller returns the
+   existing `MarketIntelligenceResponse` shape.
+
+## Career Development
+
+1. An authenticated employee calls `GET /api/learning/pathway`.
+2. The learning model fetches the employee's persisted matching results and
+   converts the top roles into the agent's session-record shape.
+3. `run_learning_pathway` starts `learning_mcp_server.py` over stdio.
+4. The MCP tool selects courses from the simulated SAP Learning Hub dataset.
+5. The model records the central audit event and the controller returns the
+   existing `LearningPathwayResponse` shape.

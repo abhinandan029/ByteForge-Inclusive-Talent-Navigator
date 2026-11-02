@@ -48,6 +48,9 @@ Pop-Location
 - Validate MCP responses and raise explicit errors.
 - Do not add local audit files or secrets.
 - Run compilation and a focused real MCP-path smoke test.
+- For FastAPI 0.162+, included routers may appear as deferred router entries;
+  validate new paths through the router's own `.routes` or the generated
+  OpenAPI schema rather than assuming every path is directly on `app.routes`.
 - Check `git diff` and avoid changing unrelated worktree files.
 
 ## Environment notes

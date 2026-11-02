@@ -56,6 +56,8 @@ must not replace domain-level orchestration or persistence.
 | Skills Discovery | `SkillsDiscoveryAgent` | `mcp_server/skill_mcp_server.py` | `extract_skills`, `normalize_skills` |
 | Opportunity Matching | `run_inclusive_matching` | `mcp_server/matching_mcp_server.py` | `run_matching` |
 | Bias Review | `run_bias_audit` | `mcp_server/bias_mcp_server.py` | `run_bias_audit` |
+| Market Intelligence | `run_market_intelligence` | `mcp_server/market_mcp_server.py` | `analyze_market_demand` |
+| Career Development | `run_learning_pathway` | `mcp_server/learning_mcp_server.py` | `generate_learning_pathway` |
 
 The public agent entry points remain compatible with their controllers. The
 MCP server invokes an internal domain core so the server performs the
@@ -66,4 +68,6 @@ specialized calculation while the agent owns transport and response handling.
 The central audit table is `AUDIT_LOGS`. Do not add per-agent JSON audit files.
 Matching persistence is handled by `app/models/matching_model.py`; Bias Review
 persistence is handled by `app/models/bias_audit_model.py`; Skills persistence
-is handled by `app/models/skills_model.py`.
+is handled by `app/models/skills_model.py`; Market Intelligence persistence is
+handled by `app/models/market_model.py`; Career Development persistence is
+handled by `app/models/learning_model.py`.
