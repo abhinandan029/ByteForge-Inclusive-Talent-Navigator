@@ -10,6 +10,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { getSkillsAuditLogs } from "../services/skillsApi";
+import AuditDetailsViewer from "../components/AuditDetailsViewer";
 
 export default function AuditLogPage() {
   const [logs, setLogs] = useState([]);
@@ -34,19 +35,6 @@ export default function AuditLogPage() {
   useEffect(() => {
     loadLogs();
   }, []);
-
-  function formatDetails(details) {
-    if (!details) return "—";
-    if (typeof details === "object") {
-      return JSON.stringify(details, null, 2);
-    }
-    try {
-      const parsed = JSON.parse(details);
-      return JSON.stringify(parsed, null, 2);
-    } catch {
-      return details;
-    }
-  }
 
   const actors = ["ALL", ...new Set(logs.map((l) => l.ACTOR || l.actor).filter(Boolean))];
 
@@ -232,10 +220,8 @@ export default function AuditLogPage() {
                           </span>
                         </td>
 
-                        <td className="px-6 py-4 max-w-md">
-                          <pre className="max-h-24 overflow-y-auto rounded-lg bg-slate-50 p-2 text-[10px] text-slate-700 font-mono border border-slate-100">
-                            {formatDetails(details)}
-                          </pre>
+                        <td className="px-6 py-4 min-w-[320px] max-w-lg">
+                          <AuditDetailsViewer details={details} />
                         </td>
                       </tr>
                     );
