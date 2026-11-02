@@ -1,6 +1,12 @@
 
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import {
+  Users,
+  UserCheck,
+  BriefcaseBusiness,
+  GitCompareArrows,
+  ShieldAlert,
+} from "lucide-react";
 
 const API_BASE_URL =
   import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
@@ -39,8 +45,6 @@ const statCards = [
 ];
 
 function HRDashboard() {
-  const navigate = useNavigate();
-
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -89,6 +93,12 @@ function HRDashboard() {
     return Number(stats[key] ?? 0).toLocaleString();
   }
 
+  const totalEmployees = Number(stats?.total_employees || 0);
+  const readyEmployees = Number(stats?.employees_ready_for_matching || 0);
+  const readinessRate = totalEmployees
+    ? Math.round((readyEmployees / totalEmployees) * 100)
+    : 0;
+  const pendingReviews = Number(stats?.pending_bias_reviews || 0);
   return (
     <div className="min-h-full bg-slate-50 px-5 py-8 sm:px-8">
       <div className="mx-auto max-w-7xl">
@@ -139,142 +149,86 @@ function HRDashboard() {
           </div>
         )}
 
-        {/* STATISTICS */}
-        <div className="mt-8 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+        {/* KEY METRICS */}
+        <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           {statCards.map((card) => (
             <div
               key={card.key}
-              className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
+              className={`rounded-xl border p-5 shadow-sm ${
+                card.key === "pending_bias_reviews" && pendingReviews > 0
+                  ? "border-amber-200 bg-amber-50/50"
+                  : "border-slate-200 bg-white"
+              }`}
             >
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm font-medium text-slate-500">
-                    {card.label}
-                  </p>
-
-                  <p className="mt-4 text-3xl font-semibold tracking-tight text-slate-900">
-                    {renderStatValue(card.key)}
-                  </p>
-                </div>
-
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-xl text-slate-700">
-                  {card.icon === "users" && "♙"}
-                  {card.icon === "user-check" && "✓"}
-                  {card.icon === "briefcase-business" && "▣"}
-                  {card.icon === "git-compare-arrows" && "⇄"}
-                  {card.icon === "shield-alert" && "⚑"}
-                </div>
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  {card.label}
+                </p>
+                {card.icon === "users" && <Users size={18} className="text-slate-500" />}
+                {card.icon === "user-check" && <UserCheck size={18} className="text-emerald-600" />}
+                {card.icon === "briefcase-business" && <BriefcaseBusiness size={18} className="text-indigo-600" />}
+                {card.icon === "git-compare-arrows" && <GitCompareArrows size={18} className="text-violet-600" />}
+                {card.icon === "shield-alert" && <ShieldAlert size={18} className="text-amber-600" />}
               </div>
-
-              <p className="mt-4 text-xs leading-5 text-slate-400">
-                {card.description}
+              <p className="mt-4 text-3xl font-semibold tracking-tight text-slate-900">
+                {renderStatValue(card.key)}
               </p>
+              <p className="mt-2 text-xs leading-5 text-slate-400">{card.description}</p>
             </div>
           ))}
         </div>
 
-        {/* QUICK ACTIONS */}
-        <section className="mt-8 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-900">
-              HR Actions
-            </h2>
-
-            <p className="mt-1 text-sm text-slate-500">
-              Review fairness signals and make informed decisions.
+        <div className="mt-8 grid gap-5 lg:grid-cols-[0.8fr_1.2fr]">
+          <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  Workforce readiness
+                </p>
+                <h2 className="mt-2 text-3xl font-semibold text-slate-900">{readinessRate}%</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  {readyEmployees.toLocaleString()} of {totalEmployees.toLocaleString()} employees ready for matching
+                </p>
+              </div>
+              <UserCheck className="text-emerald-600" size={24} />
+            </div>
+            <div className="mt-5 h-2 rounded-full bg-slate-100">
+              <div className="h-2 rounded-full bg-emerald-500" style={{ width: `${readinessRate}%` }} />
+            </div>
+            <p className="mt-3 text-xs text-slate-400">
+              Use matching to connect ready employees with active internal roles.
             </p>
-          </div>
+          </section>
 
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <button
-              type="button"
-              onClick={() => navigate("/hr/bias-audit")}
-              className="rounded-xl border border-slate-200 p-5 text-left transition hover:border-slate-400 hover:bg-slate-50"
-            >
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-50 text-lg text-amber-700">
-                  ⚑
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-900">
-                    Review Bias Flags
-                  </h3>
-
-                  <p className="mt-1 text-xs text-slate-500">
-                    Inspect and review AI fairness flags.
+          <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">Operational snapshot</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Current signals from the talent operations workspace.
+              </p>
+            </div>
+            <div className="mt-5 grid gap-2 sm:grid-cols-2">
+              <div className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 ${
+                pendingReviews ? "border-amber-200 bg-amber-50/60" : "border-emerald-200 bg-emerald-50/50"
+              }`}>
+                <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${pendingReviews ? "bg-amber-500" : "bg-emerald-500"}`} />
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Fairness queue</p>
+                  <p className="truncate text-sm font-medium text-slate-800">
+                    {pendingReviews ? `${pendingReviews} pending review${pendingReviews === 1 ? "" : "s"}` : "Queue clear"}
                   </p>
                 </div>
               </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => navigate("/hr/matching")}
-              className="rounded-xl border border-slate-200 p-5 text-left transition hover:border-slate-400 hover:bg-slate-50"
-            >
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50 text-lg text-indigo-700">
-                  ⇄
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-900">
-                    Talent Matching
-                  </h3>
-
-                  <p className="mt-1 text-xs text-slate-500">
-                    Run AI internal opportunity matching.
-                  </p>
+              <div className="flex items-center gap-3 rounded-lg border border-indigo-100 bg-indigo-50/50 px-3 py-2.5">
+                <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-indigo-500" />
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Matching coverage</p>
+                  <p className="truncate text-sm font-medium text-slate-800">{readinessRate}% workforce ready</p>
                 </div>
               </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => navigate("/hr/jobs")}
-              className="rounded-xl border border-slate-200 p-5 text-left transition hover:border-slate-400 hover:bg-slate-50"
-            >
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 text-lg text-emerald-700">
-                  ▣
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-900">
-                    Manage Job Roles
-                  </h3>
-
-                  <p className="mt-1 text-xs text-slate-500">
-                    Create and edit job vacancy criteria.
-                  </p>
-                </div>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => navigate("/hr/audit-log")}
-              className="rounded-xl border border-slate-200 p-5 text-left transition hover:border-slate-400 hover:bg-slate-50"
-            >
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-lg text-slate-700">
-                  ≡
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-900">
-                    Audit Log
-                  </h3>
-
-                  <p className="mt-1 text-xs text-slate-500">
-                    View immutable HR compliance records.
-                  </p>
-                </div>
-              </div>
-            </button>
-          </div>
-        </section>
+            </div>
+          </section>
+        </div>
 
         {/* FOOTNOTE */}
         <p className="mt-6 text-xs text-slate-400">
