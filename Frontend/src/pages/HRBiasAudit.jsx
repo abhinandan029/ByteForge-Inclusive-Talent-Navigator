@@ -9,6 +9,8 @@ import {
   submitMatchDecision,
   runBiasAudit,
 } from "../services/hrApi";
+import AgentActionCard from "../components/AgentActionCard";
+import AgentRunPanel from "../components/AgentRunPanel";
 
 const initialFilters = {
   review_status: "",
@@ -323,15 +325,30 @@ function HRBiasAudit() {
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={handleRunAudit}
-            disabled={runningAudit || loading}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-60 transition"
-          >
-            <span>{runningAudit ? "Running Bias Review Agent..." : "Run AI Bias Review Agent"}</span>
-          </button>
         </div>
+
+        <div className="mb-6">
+          <AgentActionCard
+            eyebrow="Responsible AI governance"
+            agentName="Bias Review Agent"
+            description="Audit matches and roles for explainable fairness risks before HR decisions are made."
+            badges={["Fairness signals", "Human review", "Decision safeguards"]}
+            buttonLabel="Run Bias Review"
+            runningLabel="Auditing..."
+            running={runningAudit}
+            disabled={loading}
+            onRun={handleRunAudit}
+          />
+        </div>
+
+        {runningAudit && (
+          <AgentRunPanel
+            agentName="Bias Review Agent"
+            task="Reviewing matching outcomes, role requirements, and fairness indicators for HR review."
+            steps={["Load matches", "Check fairness", "Classify flags", "Prepare report"]}
+            activeStep={1}
+          />
+        )}
 
         {/* AUDIT EXECUTION SUMMARY */}
         {auditRunResult && (

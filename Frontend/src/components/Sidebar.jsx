@@ -9,7 +9,6 @@ function Sidebar() {
     { label: "Dashboard", path: "/dashboard", icon: "▦" },
     { label: "Skills Discovery", path: "/skills", icon: "✦" },
     { label: "Role Matching", path: "/matching", icon: "↔" },
-    { label: "Fairness Review", path: "/bias-audit", icon: "✓" },
     { label: "Learning Path", path: "/learning", icon: "◇" },
     { label: "Audit Log", path: "/audit-log", icon: "≡" },
   ]
@@ -68,20 +67,6 @@ function Sidebar() {
           })}
         </div>
       </nav>
-
-      {/* RESPONSIBLE AI */}
-      <div className="shrink-0 border-t border-slate-200 p-4">
-        <div className="rounded-xl bg-slate-50 p-4">
-          <p className="text-xs font-semibold text-slate-700">
-            Responsible AI
-          </p>
-
-          <p className="mt-2 text-xs leading-5 text-slate-500">
-            AI provides recommendations and signals. People remain
-            responsible for final decisions.
-          </p>
-        </div>
-      </div>
 
     </aside>
   )

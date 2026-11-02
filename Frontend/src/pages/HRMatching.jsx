@@ -13,6 +13,7 @@ import {
   getMatchingDetails,
 } from "../services/matchingApi";
 import { getJobRoles } from "../services/jobsApi";
+import AgentRunPanel from "../components/AgentRunPanel";
 
 export default function HRMatching() {
   const navigate = useNavigate();
@@ -21,6 +22,7 @@ export default function HRMatching() {
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [runningMatching, setRunningMatching] = useState(false);
+  const [matchingStep, setMatchingStep] = useState(0);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -31,9 +33,21 @@ export default function HRMatching() {
 
   // Match detail modal
   const [selectedMatch, setSelectedMatch] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   // Run execution summary
   const [runSummary, setRunSummary] = useState(null);
+
+  useEffect(() => {
+    if (!runningMatching) return undefined;
+
+    const timers = [
+      setTimeout(() => setMatchingStep(1), 900),
+      setTimeout(() => setMatchingStep(2), 1800),
+    ];
+
+    return () => timers.forEach(clearTimeout);
+  }, [runningMatching]);
 
   async function loadData() {
     try {
@@ -69,11 +83,13 @@ export default function HRMatching() {
 
     try {
       setRunningMatching(true);
+      setMatchingStep(0);
       setError("");
       setSuccess("");
       setRunSummary(null);
 
       const result = await runInclusiveMatching();
+      setMatchingStep(3);
       setSuccess(
         result.message || "Opportunity matching completed successfully!"
       );
@@ -89,6 +105,7 @@ export default function HRMatching() {
       setError(err.message || "Matching agent execution failed.");
     } finally {
       setRunningMatching(false);
+      setMatchingStep(0);
     }
   }
 
@@ -122,7 +139,7 @@ export default function HRMatching() {
   });
 
   function getScoreBadge(score) {
-    const num = Math.round(score * 100);
+    const num = Math.round(score);
     if (num >= 80) {
       return "bg-emerald-50 text-emerald-700 border-emerald-200";
     }
@@ -160,17 +177,44 @@ export default function HRMatching() {
               Refresh
             </button>
 
+          </div>
+        </div>
+
+        <section className="mt-7 overflow-hidden rounded-2xl border border-indigo-200 bg-gradient-to-r from-indigo-700 via-indigo-600 to-purple-600 p-px shadow-sm shadow-indigo-200/50">
+          <div className="flex flex-col justify-between gap-5 rounded-[0.95rem] bg-gradient-to-br from-indigo-50/95 via-white/95 to-purple-50/95 p-5 sm:flex-row sm:items-center sm:p-6">
+            <div className="flex items-start gap-4">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-200">
+                <Sparkles size={24} />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-indigo-600">
+                  Primary workflow
+                </p>
+                <h2 className="mt-1 text-lg font-bold text-slate-900">
+                  Opportunity Matching Agent
+                </h2>
+                <p className="mt-1 max-w-2xl text-sm text-slate-600">
+                  Compare verified employee skills with active roles and
+                  generate explainable, bias-aware opportunities.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-semibold text-indigo-700">
+                  <span className="rounded-full bg-white px-3 py-1.5 shadow-sm">Skills comparison</span>
+                  <span className="rounded-full bg-white px-3 py-1.5 shadow-sm">Weighted scoring</span>
+                  <span className="rounded-full bg-white px-3 py-1.5 shadow-sm">Explainable results</span>
+                </div>
+              </div>
+            </div>
             <button
               type="button"
               onClick={handleRunMatching}
               disabled={runningMatching}
-              className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 transition disabled:opacity-60"
+              className="inline-flex min-h-14 shrink-0 items-center justify-center gap-3 rounded-2xl bg-indigo-700 px-6 py-3 text-sm font-bold text-white shadow-sm shadow-indigo-300 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <Sparkles size={15} className={runningMatching ? "animate-spin" : ""} />
-              {runningMatching ? "Running Matching Agent..." : "Run Opportunity Matching"}
+              <Sparkles size={18} className={runningMatching ? "animate-spin" : ""} />
+              {runningMatching ? "Agent Running..." : "Run Matching Agent"}
             </button>
           </div>
-        </div>
+        </section>
 
         {/* FEEDBACK & RUN SUMMARY */}
         {error && (
@@ -213,6 +257,20 @@ export default function HRMatching() {
           </div>
         )}
 
+        {runningMatching && (
+          <AgentRunPanel
+            agentName="Opportunity Matching Agent"
+            task="Comparing confirmed employee skills with active internal roles and generating explainable matches."
+            steps={[
+              "Load candidates",
+              "Compare skills",
+              "Score opportunities",
+              "Save results",
+            ]}
+            activeStep={matchingStep}
+          />
+        )}
+
         {/* CONTROLS */}
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1 max-w-md">
@@ -250,9 +308,9 @@ export default function HRMatching() {
               className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 shadow-sm focus:border-indigo-500 focus:outline-none"
             >
               <option value={0}>All Scores (0%+)</option>
-              <option value={0.5}>50%+ Match</option>
-              <option value={0.7}>70%+ Match</option>
-              <option value={0.85}>85%+ Match</option>
+              <option value={50}>50%+ Match</option>
+              <option value={70}>70%+ Match</option>
+              <option value={85}>85%+ Match</option>
             </select>
           </div>
         </div>
@@ -284,7 +342,7 @@ export default function HRMatching() {
               const expWarning = match.experience_warning || match.EXPERIENCE_WARNING;
               const explanation = match.match_explanation || match.MATCH_EXPLANATION;
 
-              const pct = Math.round(score * 100);
+              const pct = Math.min(100, Math.max(0, Math.round(score)));
 
               return (
                 <div
@@ -331,9 +389,10 @@ export default function HRMatching() {
                       <button
                         type="button"
                         onClick={() => handleViewDetail(matchId)}
+                        disabled={detailLoading}
                         className="rounded-xl border border-slate-200 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
                       >
-                        View Full Details
+                        {detailLoading ? "Loading Details..." : "View Full Details"}
                       </button>
 
                       <button
@@ -454,7 +513,13 @@ export default function HRMatching() {
                   <div>
                     <span className="text-slate-400">Calculated Match Score</span>
                     <p className="font-extrabold text-indigo-700 text-lg">
-                      {Math.round((selectedMatch.match_score || 0) * 100)}%
+                      {Math.min(
+                        100,
+                        Math.max(
+                          0,
+                          Math.round(selectedMatch.match_score || 0)
+                        )
+                      )}%
                     </p>
                   </div>
                   <div>

@@ -38,7 +38,11 @@ def get_learning_session_record(employee_id: str) -> dict:
                     for item in missing
                     if isinstance(item, dict) and item.get("skill_name")
                 ],
-                "match_score": record["match_score"],
+                "match_score": (
+                    float(record["match_score"])
+                    if record["match_score"] is not None
+                    else None
+                ),
             })
         cursor.execute(
             """
@@ -50,9 +54,26 @@ def get_learning_session_record(employee_id: str) -> dict:
         )
         columns = [column[0].lower() for column in cursor.description]
         courses = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+        cursor.execute(
+            """
+            SELECT NAME
+            FROM CONFIRMED_SKILLS_FINAL
+            WHERE EMPLOYEE_ID = ?
+            ORDER BY NAME
+            """,
+            (employee_id,),
+        )
+        confirmed_skills = [
+            row[0]
+            for row in cursor.fetchall()
+            if row[0]
+        ]
+
         return {
             "role_matches": {"recommended_roles": roles},
             "courses": courses,
+            "confirmed_skills": confirmed_skills,
         }
     finally:
         cursor.close()

@@ -2,47 +2,31 @@ import re
 from typing import Any
 
 
-def _split_sentences(text: str) -> list[str]:
-    return [
-        sentence.strip()
-        for sentence in re.split(r"(?<=[.!?])\s+", text)
-        if sentence.strip()
-    ]
+def _evidence_chunks(text: str) -> list[str]:
+    normalized_text = re.sub(r"[ \t]+", " ", text)
+    chunks = []
 
+    for line in normalized_text.splitlines():
+        line = line.strip(" \t-•*")
+        if not line:
+            continue
 
-def _contains_alias(sentence: str, alias: str) -> bool:
-    pattern = rf"(?<!\w){re.escape(alias)}(?!\w)"
-    return bool(re.search(pattern, sentence, re.IGNORECASE))
-
-
-def _has_first_person_evidence(sentence: str) -> bool:
-    action_pattern = (
-        r"\bI\b.{0,160}\b"
-        r"(?:used|use|worked|work|developed|develop|built|build|"
-        r"implemented|implement|designed|design|configured|configure|"
-        r"tested|test|maintained|maintain|created|create|completed|"
-        r"complete|earned|obtained|managed|manage|deployed|deploy|"
-        r"optimized|optimised|specialized|specialised|trained|learned|"
-        r"learnt|studied|programmed|automated|integrated|debugged|"
-        r"analyzed|analysed|migrated|administered|supported|"
-        r"leveraged|certified)\b"
-    )
-    experience_pattern = (
-        r"\bI\b.{0,160}\b(?:have|had)\b.{0,80}\b"
-        r"(?:experience|expertise|proficiency|hands-on knowledge)\b"
-    )
-    personal_context_pattern = (
-        r"\bmy\b.{0,100}\b"
-        r"(?:experience|expertise|responsibilities|training|certification)\b"
-    )
-    return any(
-        re.search(pattern, sentence, re.IGNORECASE)
-        for pattern in (
-            action_pattern,
-            experience_pattern,
-            personal_context_pattern,
+        chunks.extend(
+            sentence.strip()
+            for sentence in re.split(r"(?<=[.!?])\s+", line)
+            if sentence.strip()
         )
-    )
+
+    return chunks
+
+
+def _contains_alias(text: str, alias: str) -> bool:
+    alias = alias.strip()
+    if not alias:
+        return False
+
+    pattern = rf"(?<!\w){re.escape(alias)}(?!\w)"
+    return bool(re.search(pattern, text, re.IGNORECASE))
 
 
 def extract_skills(
@@ -55,9 +39,7 @@ def extract_skills(
 
     extracted = []
     seen = set()
-    for sentence in _split_sentences(profile_text):
-        if not _has_first_person_evidence(sentence):
-            continue
+    for evidence in _evidence_chunks(profile_text):
         for row in taxonomy_rows:
             skill_id = str(row.get("skill_id") or "").strip()
             canonical_name = str(row.get("canonical_name") or "").strip()
@@ -68,10 +50,11 @@ def extract_skills(
                 aliases = [aliases]
             if skill_id in seen:
                 continue
-            if any(_contains_alias(sentence, str(alias)) for alias in aliases):
+            aliases = [canonical_name, *[str(alias) for alias in aliases]]
+            if any(_contains_alias(evidence, alias) for alias in aliases):
                 extracted.append({
                     "raw_skill": canonical_name,
-                    "evidence": sentence,
+                    "evidence": evidence,
                 })
                 seen.add(skill_id)
     return extracted

@@ -11,8 +11,8 @@ import {
   AlertCircle,
   RefreshCw,
   ArrowRight,
-  ShieldCheck,
   Sparkles,
+  Target,
 } from "lucide-react";
 
 import { getEmployeeSkills } from "../services/skillsApi";
@@ -247,120 +247,148 @@ export default function Dashboard() {
 
   const confirmedSkills =
     employeeData?.confirmed_skills_final || [];
+  const pendingSkillCount = draftSkills.length;
+  const confirmedSkillCount = confirmedSkills.length;
+  const profileFields = [
+    employee?.full_name,
+    employee?.current_role,
+    employee?.grade,
+    employee?.years_experience != null,
+  ];
+  const profileCompletion = Math.round(
+    (profileFields.filter(Boolean).length / profileFields.length) * 100
+  );
+  const nextStep = !isConfirmed
+    ? "Review and confirm your extracted skills"
+    : !readyForMatching
+      ? "Complete your profile to unlock matching"
+      : "Explore opportunities matched to your skills";
+  const nextStepLink = !isConfirmed
+    ? "/skills"
+    : !readyForMatching
+      ? "/skills"
+      : "/matching";
 
   // ==========================================
   // DASHBOARD UI
   // ==========================================
 
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 lg:px-10">
+    <main className="min-h-screen bg-[#f4f7fb] px-4 py-6 sm:px-6 lg:px-10">
       <div className="mx-auto max-w-7xl">
 
         {/* HEADER */}
 
-        <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-          <div>
-            <p className="text-sm font-medium text-indigo-600">
-              INCLUSIVE TALENT NAVIGATOR
-            </p>
-
-            <h1 className="mt-2 text-3xl font-bold text-slate-900">
-              Welcome,{" "}
-              {employee?.full_name ||
-                loggedInEmployee?.full_name ||
-                "Employee"}
-            </h1>
-
-            <p className="mt-2 text-slate-500">
-              Your employee profile and skills overview.
-            </p>
+        <section className="mb-6 overflow-hidden rounded-[2rem] bg-slate-950 text-white shadow-xl shadow-slate-200">
+          <div className="relative p-7 sm:p-9">
+            <div className="absolute -right-20 -top-24 h-72 w-72 rounded-full bg-indigo-500/20 blur-3xl" />
+            <div className="relative flex flex-col justify-between gap-8 lg:flex-row lg:items-end">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-300">
+                  Employee command center
+                </p>
+                <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
+                  Welcome back,{" "}
+                  {employee?.full_name ||
+                    loggedInEmployee?.full_name ||
+                    "Employee"}
+                </h1>
+                <p className="mt-3 max-w-xl text-sm leading-6 text-slate-300">
+                  Keep your profile ready, validate your skills, and discover opportunities
+                  that fit the direction you want to grow.
+                </p>
+              </div>
+              <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white text-indigo-700">
+                  <UserRound size={25} />
+                </div>
+                <div>
+                  <p className="font-semibold">{employee?.current_role || "Role not provided"}</p>
+                  <p className="mt-1 text-xs text-slate-300">Employee ID: {employee?.employee_id || employeeId}</p>
+                </div>
+              </div>
+            </div>
           </div>
-
-          <Link
-            to="/skills"
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700"
-          >
-            Manage Skills
-            <ArrowRight size={17} />
-          </Link>
-        </div>
-
-        {/* EMPLOYEE PROFILE */}
-
-        <section className="mb-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-700">
-              <UserRound size={30} />
-            </div>
-
-            <div className="flex-1">
-              <h2 className="text-xl font-bold text-slate-900">
-                {employee?.full_name ||
-                  loggedInEmployee?.full_name ||
-                  "Employee"}
-              </h2>
-
-              <p className="mt-1 text-slate-500">
-                {employee?.current_role || "Role not provided"}
-              </p>
-
-              <p className="mt-2 text-xs text-slate-400">
-                Employee ID: {employee?.employee_id || employeeId}
+          <div className="grid border-t border-white/10 bg-white/5 sm:grid-cols-3">
+            <div className="border-b border-white/10 px-7 py-4 sm:border-b-0 sm:border-r">
+              <p className="text-xs text-slate-400">Matching status</p>
+              <p className="mt-1 flex items-center gap-2 text-sm font-semibold">
+                {readyForMatching ? <CheckCircle2 size={15} className="text-emerald-400" /> : <Clock3 size={15} className="text-amber-300" />}
+                {readyForMatching ? "Ready for opportunities" : "Profile needs attention"}
               </p>
             </div>
-
-            <div
-              className={`inline-flex items-center gap-2 self-start rounded-full px-4 py-2 text-sm font-medium sm:self-center ${
-                readyForMatching
-                  ? "bg-emerald-50 text-emerald-700"
-                  : "bg-amber-50 text-amber-700"
-              }`}
-            >
-              {readyForMatching ? (
-                <CheckCircle2 size={17} />
-              ) : (
-                <Clock3 size={17} />
-              )}
-
-              {readyForMatching
-                ? "Ready for matching"
-                : "Not ready for matching"}
+            <div className="border-b border-white/10 px-7 py-4 sm:border-b-0 sm:border-r">
+              <p className="text-xs text-slate-400">Confirmed skills</p>
+              <p className="mt-1 text-sm font-semibold">{confirmedSkillCount} verified skill{confirmedSkillCount === 1 ? "" : "s"}</p>
+            </div>
+            <div className="px-7 py-4">
+              <p className="text-xs text-slate-400">Profile readiness</p>
+              <p className="mt-1 text-sm font-semibold">{profileCompletion}% complete</p>
             </div>
           </div>
         </section>
 
-        {/* PROFILE INFORMATION */}
+        {/* NEXT STEP */}
 
-        <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <section className="mb-6 grid gap-5 lg:grid-cols-[1.4fr_0.6fr]">
+          <div className="rounded-2xl border border-indigo-100 bg-indigo-600 p-6 text-white shadow-lg shadow-indigo-100">
+            <p className="text-xs font-semibold uppercase tracking-wider text-indigo-200">Recommended next step</p>
+            <h2 className="mt-2 text-xl font-semibold">{nextStep}</h2>
+            <p className="mt-2 max-w-xl text-sm leading-6 text-indigo-100">
+              Complete this step to improve the quality of your opportunity recommendations.
+            </p>
+            <Link
+              to={nextStepLink}
+              className="mt-5 inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-indigo-700 hover:bg-indigo-50"
+            >
+              Continue
+              <ArrowRight size={16} />
+            </Link>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-slate-800">Profile readiness</p>
+                <p className="mt-1 text-xs text-slate-500">Saved profile details</p>
+              </div>
+              <Target className="text-indigo-600" size={22} />
+            </div>
+            <div className="mt-5 flex items-end justify-between">
+              <span className="text-3xl font-bold text-slate-900">{profileCompletion}%</span>
+              <span className="text-xs font-medium text-slate-500">{readyForMatching ? "Ready" : "Needs attention"}</span>
+            </div>
+            <div className="mt-3 h-2 rounded-full bg-slate-100">
+              <div className="h-2 rounded-full bg-indigo-600" style={{ width: `${profileCompletion}%` }} />
+            </div>
+          </div>
+        </section>
+
+        {/* PROFILE SNAPSHOT */}
+
+        <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           <InfoCard
             icon={BriefcaseBusiness}
             title="Current Role"
             value={employee?.current_role || "Not provided"}
           />
-
           <InfoCard
             icon={GraduationCap}
             title="Grade"
             value={employee?.grade || "Not provided"}
           />
-
           <InfoCard
             icon={Clock3}
             title="Experience"
-            value={
-              employee?.years_experience != null
-                ? `${employee.years_experience} years`
-                : "Not provided"
-            }
+            value={employee?.years_experience != null ? `${employee.years_experience} years` : "Not provided"}
           />
-
           <InfoCard
             icon={Brain}
             title="Career Break"
-            value={
-              employee?.has_career_break ? "Yes" : "No"
-            }
+            value={employee?.has_career_break ? "Yes" : "No"}
           />
+          <InfoCard icon={CheckCircle2} title="Confirmed" value={confirmedSkillCount} subtitle="Verified skills" />
+          <InfoCard icon={Clock3} title="To review" value={pendingSkillCount} subtitle="Pending skills" />
         </div>
 
         {/* SKILLS OVERVIEW */}
@@ -424,27 +452,6 @@ export default function Dashboard() {
 
               <ArrowRight size={16} />
             </Link>
-          </div>
-
-          {/* RESPONSIBLE AI */}
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="rounded-xl bg-emerald-50 p-3 text-emerald-600">
-                <ShieldCheck size={21} />
-              </div>
-
-              <div>
-                <h3 className="font-semibold text-slate-800">
-                  Responsible AI
-                </h3>
-
-                <p className="text-sm text-slate-500">
-                  Skills are presented for employee review and confirmation
-                  before matching readiness is enabled.
-                </p>
-              </div>
-            </div>
           </div>
 
         </section>

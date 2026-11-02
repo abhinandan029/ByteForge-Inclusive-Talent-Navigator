@@ -19,6 +19,11 @@ def generate_learning_pathway(
         raise ValueError("Session record must be a JSON object.")
 
     courses_data = session_record.get("courses") or []
+    confirmed_skills = {
+        str(skill).strip().casefold()
+        for skill in session_record.get("confirmed_skills") or []
+        if str(skill).strip()
+    }
 
     role_matches = session_record.get("role_matches", {}).get(
         "recommended_roles", []
@@ -33,10 +38,21 @@ def generate_learning_pathway(
     selected = []
     matched_gaps = set()
     for course in courses_data:
-        if course["target_skill"] in gaps or len(selected) < 4:
+        target_skill = str(course["target_skill"]).strip()
+        if (
+            target_skill.casefold() not in confirmed_skills
+            and (target_skill in gaps or len(selected) < 4)
+        ):
             if course["course_id"] not in {item["course_id"] for item in selected}:
                 selected.append(course)
-                matched_gaps.add(course["target_skill"])
+                matched_gaps.add(target_skill)
+
+    if not selected:
+        for course in courses_data[:4]:
+            target_skill = str(course["target_skill"]).strip()
+            if course["course_id"] not in {item["course_id"] for item in selected}:
+                selected.append(course)
+                matched_gaps.add(target_skill)
 
     return json.dumps({
         "employee_id": employee_id,
