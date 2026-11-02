@@ -18,6 +18,7 @@ export default function MatchingPage() {
   const [pathway, setPathway] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   async function loadData() {
     if (!employee?.employee_id) return;
@@ -94,6 +95,22 @@ export default function MatchingPage() {
                 Loading your matched internal opportunities...
               </p>
             </div>
+          </div>
+        ) : error ? (
+          <div className="mt-8 rounded-2xl border border-rose-200 bg-rose-50 p-8 text-center">
+            <h2 className="text-xl font-bold text-rose-900">
+              Unable to load matching status
+            </h2>
+            <p className="mx-auto mt-2 max-w-md text-sm text-rose-800">
+              {error}
+            </p>
+            <button
+              type="button"
+              onClick={loadData}
+              className="mt-6 rounded-xl bg-rose-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-rose-800"
+            >
+              Try again
+            </button>
           </div>
         ) : !isConfirmed ? (
           /* NOT CONFIRMED BANNER */

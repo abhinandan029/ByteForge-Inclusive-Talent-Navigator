@@ -31,6 +31,7 @@ export default function HRMatching() {
 
   // Match detail modal
   const [selectedMatch, setSelectedMatch] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   // Run execution summary
   const [runSummary, setRunSummary] = useState(null);
@@ -122,7 +123,7 @@ export default function HRMatching() {
   });
 
   function getScoreBadge(score) {
-    const num = Math.round(score * 100);
+    const num = Math.round(score);
     if (num >= 80) {
       return "bg-emerald-50 text-emerald-700 border-emerald-200";
     }
@@ -250,9 +251,9 @@ export default function HRMatching() {
               className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 shadow-sm focus:border-indigo-500 focus:outline-none"
             >
               <option value={0}>All Scores (0%+)</option>
-              <option value={0.5}>50%+ Match</option>
-              <option value={0.7}>70%+ Match</option>
-              <option value={0.85}>85%+ Match</option>
+              <option value={50}>50%+ Match</option>
+              <option value={70}>70%+ Match</option>
+              <option value={85}>85%+ Match</option>
             </select>
           </div>
         </div>
@@ -284,7 +285,7 @@ export default function HRMatching() {
               const expWarning = match.experience_warning || match.EXPERIENCE_WARNING;
               const explanation = match.match_explanation || match.MATCH_EXPLANATION;
 
-              const pct = Math.round(score * 100);
+              const pct = Math.min(100, Math.max(0, Math.round(score)));
 
               return (
                 <div
@@ -331,9 +332,10 @@ export default function HRMatching() {
                       <button
                         type="button"
                         onClick={() => handleViewDetail(matchId)}
+                        disabled={detailLoading}
                         className="rounded-xl border border-slate-200 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
                       >
-                        View Full Details
+                        {detailLoading ? "Loading Details..." : "View Full Details"}
                       </button>
 
                       <button
@@ -454,7 +456,13 @@ export default function HRMatching() {
                   <div>
                     <span className="text-slate-400">Calculated Match Score</span>
                     <p className="font-extrabold text-indigo-700 text-lg">
-                      {Math.round((selectedMatch.match_score || 0) * 100)}%
+                      {Math.min(
+                        100,
+                        Math.max(
+                          0,
+                          Math.round(selectedMatch.match_score || 0)
+                        )
+                      )}%
                     </p>
                   </div>
                   <div>
