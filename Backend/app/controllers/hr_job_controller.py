@@ -5,6 +5,7 @@ from app.models.hr_job_model import (
     update_job_role,
     update_job_role_status,
     add_required_skills,
+    delete_required_skill,
     get_existing_skill_names,
     get_hr_audit_logs
 )
@@ -106,6 +107,23 @@ def add_skills_to_job_role(
     )
 
     if not success:
+        return None
+
+    return get_job_role_by_id(job_role_id)
+
+
+def remove_skill_from_job_role(
+    job_role_id: str,
+    requirement_id: str,
+    hr_id: str,
+):
+    removed = delete_required_skill(
+        job_role_id,
+        requirement_id,
+        hr_id,
+    )
+
+    if not removed:
         return None
 
     return get_job_role_by_id(job_role_id)
