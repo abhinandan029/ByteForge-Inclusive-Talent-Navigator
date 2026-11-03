@@ -4,7 +4,7 @@ from app.database.connection import (
 )
 
 
-def get_hr_auth_record(email: str):
+def get_hr_auth_record(hr_id: str):
     conn = None
     cursor = None
 
@@ -22,9 +22,9 @@ def get_hr_auth_record(email: str):
                 DEPARTMENT,
                 IS_ACTIVE
             FROM HR_USERS
-            WHERE EMAIL = ?
+            WHERE HR_ID = ?
             """,
-            (email,)
+            (hr_id,)
         )
 
         row = cursor.fetchone()

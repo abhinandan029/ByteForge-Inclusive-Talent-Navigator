@@ -1,8 +1,8 @@
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field
 
 
 class HRLoginRequest(BaseModel):
-    email: EmailStr
+    hr_id: str = Field(min_length=1)
     password: str = Field(min_length=1)
 
 

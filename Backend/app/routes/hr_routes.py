@@ -48,14 +48,14 @@ def hr_login(
 ):
 
     result = login_hr(
-        payload.email.strip().lower(),
+        payload.hr_id.strip(),
         payload.password
     )
 
     if not result:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password"
+            detail="Invalid HR ID or password"
         )
 
     response.set_cookie(
