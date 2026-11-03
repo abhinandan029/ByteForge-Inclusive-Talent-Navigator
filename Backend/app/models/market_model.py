@@ -25,9 +25,21 @@ def get_market_session_record(employee_id: str) -> dict:
         skills = [dict(zip(columns, row)) for row in cursor.fetchall()]
         cursor.execute(
             """
-            SELECT SKILL, DEMAND_LEVEL, TREND, OPEN_INTERNAL_ROLES, MARKET_NOTE
-            FROM MARKET_DEMAND
-            WHERE IS_ACTIVE = 1
+            SELECT
+                COALESCE(st.CANONICAL_NAME, md.SKILL_ID) AS SKILL,
+                md.DEMAND_LEVEL,
+                md.TREND,
+                md.OPEN_INTERNAL_ROLES,
+                md.MARKET_NOTE,
+                CASE
+                    WHEN md.IS_SIMULATED = 1
+                    THEN 'SIMULATED_MARKET_DATA'
+                    ELSE 'ACTIVE_INTERNAL_ROLES'
+                END AS SOURCE
+            FROM MARKET_DEMAND md
+            LEFT JOIN SKILL_TAXONOMY st
+                ON st.SKILL_ID = md.SKILL_ID
+            WHERE md.IS_ACTIVE = 1
             ORDER BY SKILL
             """
         )
