@@ -50,38 +50,78 @@ export default function MatchingPage() {
   const confirmedSkills = profile?.confirmed_skills_final || [];
 
   return (
-    <div className="min-h-full bg-slate-50 px-5 py-8 sm:px-8">
+    <div className="min-h-screen bg-[#f4f7fb] px-4 py-6 sm:px-6 lg:px-10">
       <div className="mx-auto max-w-7xl">
-        {/* HEADER */}
-        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-          <div>
-            <div className="flex items-center gap-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                Internal Career Mobility
-              </p>
-              <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700 border border-indigo-200">
-                <Sparkles size={11} /> Inclusive Matching Engine
-              </span>
-            </div>
 
-            <h1 className="mt-1 text-2xl font-bold text-slate-900">
-              Role Matching & Opportunities
-            </h1>
-            <p className="mt-1 text-sm text-slate-500">
-              Internal career opportunities matched to your verified skills using our name-blind, inclusive matching algorithms.
-            </p>
+        {/* HERO BANNER (DASHBOARD STYLE) */}
+        <section className="mb-6 overflow-hidden rounded-[2rem] bg-slate-950 text-white shadow-xl shadow-slate-200">
+          <div className="relative p-7 sm:p-9">
+            <div className="absolute -right-20 -top-24 h-72 w-72 rounded-full bg-indigo-500/20 blur-3xl" />
+            <div className="relative flex flex-col justify-between gap-8 lg:flex-row lg:items-end">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-300">
+                  Internal Career Mobility
+                </p>
+                <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
+                  Role Matching & Opportunities
+                </h1>
+                <p className="mt-3 max-w-xl text-sm leading-6 text-slate-300">
+                  Internal career opportunities matched to your verified skills using our name-blind, inclusive matching algorithms.
+                </p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white text-indigo-700">
+                    <Briefcase size={25} />
+                  </div>
+                  <div>
+                    <p className="font-semibold">{targetRole || "Matching Engine Active"}</p>
+                    <p className="mt-1 text-xs text-slate-300">
+                      Inclusive Matching · Verified Skills
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={loadData}
+                  disabled={loading}
+                  className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-white backdrop-blur hover:bg-white/20 transition disabled:opacity-50"
+                >
+                  <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
+                  Refresh
+                </button>
+              </div>
+            </div>
           </div>
 
-          <button
-            type="button"
-            onClick={loadData}
-            disabled={loading}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
-          >
-            <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
-            Refresh
-          </button>
-        </div>
+          <div className="grid border-t border-white/10 bg-white/5 sm:grid-cols-3">
+            <div className="border-b border-white/10 px-7 py-4 sm:border-b-0 sm:border-r">
+              <p className="text-xs text-slate-400">Confirmation status</p>
+              <p className="mt-1 flex items-center gap-2 text-sm font-semibold">
+                {isConfirmed ? (
+                  <CheckCircle2 size={15} className="text-emerald-400" />
+                ) : (
+                  <Target size={15} className="text-amber-300" />
+                )}
+                {isConfirmed ? "Skills Confirmed" : "Requires Confirmation"}
+              </p>
+            </div>
+            <div className="border-b border-white/10 px-7 py-4 sm:border-b-0 sm:border-r">
+              <p className="text-xs text-slate-400">Confirmed skills</p>
+              <p className="mt-1 text-sm font-semibold">
+                {confirmedSkills.length} verified skill{confirmedSkills.length === 1 ? "" : "s"}
+              </p>
+            </div>
+            <div className="px-7 py-4">
+              <p className="text-xs text-slate-400">Skill gaps addressed</p>
+              <p className="mt-1 text-sm font-semibold">
+                {missingSkills.length} skill gap{missingSkills.length === 1 ? "" : "s"} identified
+              </p>
+            </div>
+          </div>
+        </section>
 
         {/* LOADING & ERROR STATES */}
         {loading ? (

@@ -451,73 +451,77 @@ export default function SkillsPage() {
   // =====================================================
 
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 lg:px-10">
-      <div className="mx-auto max-w-5xl">
+    <main className="min-h-screen bg-[#f4f7fb] px-4 py-6 sm:px-6 lg:px-10">
+      <div className="mx-auto max-w-7xl">
 
-        {/* PAGE HEADER */}
-
-        <div className="mb-8">
+        {/* BACK LINK */}
+        <div className="mb-4">
           <Link
             to="/dashboard"
-            className="mb-5 inline-flex items-center gap-2 text-sm text-slate-500 hover:text-indigo-600"
+            className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-indigo-600 transition"
           >
             <ArrowLeft size={16} />
             Back to Dashboard
           </Link>
-
-          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-            <div>
-              <p className="text-sm font-medium text-indigo-600">
-                SKILLS DISCOVERY
-              </p>
-
-              <h1 className="mt-2 text-3xl font-bold text-slate-900">
-                Review Your Skills
-              </h1>
-
-              <p className="mt-2 text-slate-500">
-                Review the skills identified from your employee profile.
-                You remain in control of what gets confirmed.
-              </p>
-            </div>
-
-            <div
-              className={`inline-flex items-center gap-2 self-start rounded-full px-4 py-2 text-sm font-medium ${
-                readyForMatching
-                  ? "bg-emerald-50 text-emerald-700"
-                  : isConfirmed
-                    ? "bg-slate-100 text-slate-700"
-                    : "bg-amber-50 text-amber-700"
-              }`}
-            >
-              {readyForMatching ? (
-                <CheckCircle2 size={17} />
-              ) : (
-                <AlertCircle size={17} />
-              )}
-
-              {confirmationStatus}
-            </div>
-          </div>
         </div>
 
+        {/* HERO BANNER (DASHBOARD STYLE) */}
+        <section className="mb-6 overflow-hidden rounded-[2rem] bg-slate-950 text-white shadow-xl shadow-slate-200">
+          <div className="relative p-7 sm:p-9">
+            <div className="absolute -right-20 -top-24 h-72 w-72 rounded-full bg-indigo-500/20 blur-3xl" />
+            <div className="relative flex flex-col justify-between gap-8 lg:flex-row lg:items-end">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-300">
+                  Skills Discovery & Extraction
+                </p>
+                <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
+                  Review Your Skills
+                </h1>
+                <p className="mt-3 max-w-xl text-sm leading-6 text-slate-300">
+                  Review the skills identified from your employee profile and uploaded documents.
+                  You remain in control of what gets confirmed.
+                </p>
+              </div>
 
-        {/* EMPLOYEE DETAILS */}
+              <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white text-indigo-700">
+                  <Brain size={25} />
+                </div>
+                <div>
+                  <p className="font-semibold">{employee?.full_name || "Employee"}</p>
+                  <p className="mt-1 text-xs text-slate-300">
+                    {employee?.current_role || "Role not provided"} · ID: {employee?.employee_id || employeeId}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
 
-        <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-sm text-slate-500">
-            Employee
-          </p>
-
-          <h2 className="mt-1 text-lg font-bold text-slate-900">
-            {employee?.full_name || "Employee"}
-          </h2>
-
-          <p className="mt-1 text-sm text-slate-500">
-            {employee?.current_role || "Role not provided"}
-            {" · "}
-            ID: {employee?.employee_id || employeeId}
-          </p>
+          <div className="grid border-t border-white/10 bg-white/5 sm:grid-cols-3">
+            <div className="border-b border-white/10 px-7 py-4 sm:border-b-0 sm:border-r">
+              <p className="text-xs text-slate-400">Confirmation status</p>
+              <p className="mt-1 flex items-center gap-2 text-sm font-semibold">
+                {readyForMatching ? (
+                  <CheckCircle2 size={15} className="text-emerald-400" />
+                ) : (
+                  <AlertCircle size={15} className="text-amber-300" />
+                )}
+                {confirmationStatus}
+              </p>
+            </div>
+            <div className="border-b border-white/10 px-7 py-4 sm:border-b-0 sm:border-r">
+              <p className="text-xs text-slate-400">Pending review</p>
+              <p className="mt-1 text-sm font-semibold">
+                {draftSkills.length} skill{draftSkills.length === 1 ? "" : "s"} awaiting confirmation
+              </p>
+            </div>
+            <div className="px-7 py-4">
+              <p className="text-xs text-slate-400">Confirmed skills</p>
+              <p className="mt-1 text-sm font-semibold">
+                {confirmedSkills.length} verified skill{confirmedSkills.length === 1 ? "" : "s"}
+              </p>
+            </div>
+          </div>
         </section>
 
 
@@ -569,27 +573,23 @@ export default function SkillsPage() {
           />
         )}
 
-        {/* AI EXTRACTION */}
-
-        <section className="mb-6 overflow-hidden rounded-2xl border border-indigo-200 bg-linear-to-r from-indigo-700 via-indigo-600 to-purple-600 p-px shadow-sm shadow-indigo-200/50">
-          <div className="rounded-[0.95rem] bg-linear-to-br from-indigo-50/95 via-white/95 to-purple-50/95 p-5 sm:p-6">
-          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-            <div className="flex gap-3">
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-200">
-                <Sparkles size={22} />
+        {/* AI EXTRACTION (DASHBOARD STYLE) */}
+        <section className="mb-6 rounded-2xl border border-indigo-100 bg-indigo-600 p-6 text-white shadow-lg shadow-indigo-100">
+          <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white backdrop-blur">
+                <Sparkles size={24} />
               </div>
 
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-indigo-600">
-                  Run agent
+                <p className="text-xs font-semibold uppercase tracking-wider text-indigo-200">
+                  Run Agent
                 </p>
-                <h3 className="mt-1 text-lg font-bold text-slate-900">
+                <h3 className="mt-1 text-xl font-semibold text-white">
                   Skills Discovery Agent
                 </h3>
-
-                <p className="mt-1 text-sm text-slate-600">
-                  Analyze your uploaded documents, identify evidence, and
-                  prepare skills for your review.
+                <p className="mt-1 max-w-xl text-sm leading-6 text-indigo-100">
+                  Analyze your uploaded documents, identify evidence, and prepare skills for your review.
                 </p>
               </div>
             </div>
@@ -598,14 +598,11 @@ export default function SkillsPage() {
               type="button"
               onClick={handleExtractSkills}
               disabled={extracting || saving || reviewChanged}
-              className="inline-flex min-h-14 shrink-0 items-center justify-center gap-3 rounded-2xl bg-indigo-700 px-6 py-3 text-sm font-bold text-white shadow-sm shadow-indigo-300 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2.5 rounded-xl bg-white px-6 py-3 text-sm font-semibold text-indigo-700 shadow-sm transition hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {extracting ? (
                 <>
-                  <RefreshCw
-                    size={17}
-                    className="animate-spin"
-                  />
+                  <RefreshCw size={17} className="animate-spin" />
                   Extracting...
                 </>
               ) : (
@@ -616,11 +613,11 @@ export default function SkillsPage() {
               )}
             </button>
           </div>
-          <div className="mt-4 flex flex-wrap gap-2 text-[11px] font-semibold text-indigo-700">
-            <span className="rounded-full bg-white px-3 py-1.5 shadow-sm">Evidence-based</span>
-            <span className="rounded-full bg-white px-3 py-1.5 shadow-sm">Taxonomy normalized</span>
-            <span className="rounded-full bg-white px-3 py-1.5 shadow-sm">Human reviewed</span>
-          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2 text-xs font-medium text-indigo-100">
+            <span className="rounded-full bg-white/10 px-3 py-1 backdrop-blur border border-white/20">Evidence-based</span>
+            <span className="rounded-full bg-white/10 px-3 py-1 backdrop-blur border border-white/20">Taxonomy normalized</span>
+            <span className="rounded-full bg-white/10 px-3 py-1 backdrop-blur border border-white/20">Human reviewed</span>
           </div>
         </section>
 

@@ -67,26 +67,64 @@ export default function FairnessReviewPage() {
   ];
 
   return (
-    <div className="min-h-full bg-slate-50 px-5 py-8 sm:px-8">
+    <div className="min-h-screen bg-[#f4f7fb] px-4 py-6 sm:px-6 lg:px-10">
       <div className="mx-auto max-w-7xl">
-        {/* HEADER */}
-        <div>
-          <div className="flex items-center gap-2">
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-              Responsible AI Governance
-            </p>
-            <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-bold text-indigo-700 border border-indigo-200">
-              <Sparkles size={12} /> Ethical AI Charter
-            </span>
+
+        {/* HERO BANNER (DASHBOARD STYLE) */}
+        <section className="mb-6 overflow-hidden rounded-[2rem] bg-slate-950 text-white shadow-xl shadow-slate-200">
+          <div className="relative p-7 sm:p-9">
+            <div className="absolute -right-20 -top-24 h-72 w-72 rounded-full bg-indigo-500/20 blur-3xl" />
+            <div className="relative flex flex-col justify-between gap-8 lg:flex-row lg:items-end">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-300">
+                  Responsible AI Governance
+                </p>
+                <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
+                  Fairness & Bias Review
+                </h1>
+                <p className="mt-3 max-w-xl text-sm leading-6 text-slate-300">
+                  Learn how the Inclusive Talent Navigator guarantees equitable evaluation, eliminates historical bias, and protects diverse talent.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white text-indigo-700">
+                  <ShieldCheck size={25} />
+                </div>
+                <div>
+                  <p className="font-semibold">Ethical AI Charter</p>
+                  <p className="mt-1 text-xs text-slate-300">
+                    Demographic-Blind Matching Active
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <h1 className="mt-1 text-2xl font-bold text-slate-900">
-            Fairness & Bias Review
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Learn how the Inclusive Talent Navigator guarantees equitable evaluation, eliminates historical bias, and protects diverse talent.
-          </p>
-        </div>
+          <div className="grid border-t border-white/10 bg-white/5 sm:grid-cols-3">
+            <div className="border-b border-white/10 px-7 py-4 sm:border-b-0 sm:border-r">
+              <p className="text-xs text-slate-400">Demographic Screening</p>
+              <p className="mt-1 flex items-center gap-2 text-sm font-semibold">
+                <CheckCircle2 size={15} className="text-emerald-400" />
+                100% Name & Demographic Blind
+              </p>
+            </div>
+            <div className="border-b border-white/10 px-7 py-4 sm:border-b-0 sm:border-r">
+              <p className="text-xs text-slate-400">Career-Break Protection</p>
+              <p className="mt-1 flex items-center gap-2 text-sm font-semibold">
+                <CheckCircle2 size={15} className="text-emerald-400" />
+                Tenure-gap penalty disabled
+              </p>
+            </div>
+            <div className="px-7 py-4">
+              <p className="text-xs text-slate-400">Governance Model</p>
+              <p className="mt-1 flex items-center gap-2 text-sm font-semibold">
+                <HeartHandshake size={15} className="text-emerald-400" />
+                Human-in-the-loop enforced
+              </p>
+            </div>
+          </div>
+        </section>
 
         {/* EMPLOYEE STATUS CARD */}
         <div className="mt-6 rounded-2xl border border-indigo-100 bg-white p-6 shadow-sm">

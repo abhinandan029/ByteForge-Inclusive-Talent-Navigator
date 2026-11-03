@@ -91,22 +91,79 @@ export default function LearningPathPage() {
   }
 
   return (
-    <div className="min-h-full bg-slate-50 px-5 py-8 sm:px-8">
+    <div className="min-h-screen bg-[#f4f7fb] px-4 py-6 sm:px-6 lg:px-10">
       <div className="mx-auto max-w-7xl">
-        {/* HEADER */}
-        <div className="flex flex-col justify-between gap-5 border-b border-slate-200 pb-6 sm:flex-row sm:items-end">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-              Career Development & Market Intelligence
-            </p>
-            <h1 className="mt-1 text-2xl font-bold text-slate-900">
-              Personalized Learning Pathway
-            </h1>
-            <p className="mt-1 text-sm text-slate-500">
-              AI-recommended SAP Learning Hub courses to bridge skill gaps and real-time market demand signals.
-            </p>
+
+        {/* HERO BANNER (DASHBOARD STYLE) */}
+        <section className="mb-6 overflow-hidden rounded-[2rem] bg-slate-950 text-white shadow-xl shadow-slate-200">
+          <div className="relative p-7 sm:p-9">
+            <div className="absolute -right-20 -top-24 h-72 w-72 rounded-full bg-indigo-500/20 blur-3xl" />
+            <div className="relative flex flex-col justify-between gap-8 lg:flex-row lg:items-end">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-300">
+                  Career Development & Market Intelligence
+                </p>
+                <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
+                  Personalized Learning Pathway
+                </h1>
+                <p className="mt-3 max-w-xl text-sm leading-6 text-slate-300">
+                  AI-recommended SAP Learning Hub courses to bridge skill gaps and real-time market demand signals.
+                </p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white text-indigo-700">
+                    <GraduationCap size={25} />
+                  </div>
+                  <div>
+                    <p className="font-semibold">{pathway?.target_role || "SAP Career Pathway"}</p>
+                    <p className="mt-1 text-xs text-slate-300">
+                      SAP Learning Hub · Verified Curricula
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    loadPathway();
+                    loadMarket();
+                  }}
+                  disabled={pathwayLoading || marketLoading}
+                  className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-white backdrop-blur hover:bg-white/20 transition disabled:opacity-50"
+                >
+                  <RefreshCw
+                    size={15}
+                    className={pathwayLoading || marketLoading ? "animate-spin" : ""}
+                  />
+                  Refresh
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
+
+          <div className="grid border-t border-white/10 bg-white/5 sm:grid-cols-3">
+            <div className="border-b border-white/10 px-7 py-4 sm:border-b-0 sm:border-r">
+              <p className="text-xs text-slate-400">Target Role</p>
+              <p className="mt-1 text-sm font-semibold truncate">
+                {pathway?.target_role || "Evaluating opportunities"}
+              </p>
+            </div>
+            <div className="border-b border-white/10 px-7 py-4 sm:border-b-0 sm:border-r">
+              <p className="text-xs text-slate-400">Skill Gaps Addressed</p>
+              <p className="mt-1 text-sm font-semibold">
+                {pathway?.skill_gaps_addressed?.length || 0} skill gap{(pathway?.skill_gaps_addressed?.length === 1) ? "" : "s"} targeted
+              </p>
+            </div>
+            <div className="px-7 py-4">
+              <p className="text-xs text-slate-400">Market Signals</p>
+              <p className="mt-1 text-sm font-semibold">
+                {market?.high_demand_count ? `${market.high_demand_count} high-demand skills` : "Real-time demand active"}
+              </p>
+            </div>
+          </div>
+        </section>
 
         <div className="mt-6 grid gap-4 lg:grid-cols-2">
           <AgentActionCard
