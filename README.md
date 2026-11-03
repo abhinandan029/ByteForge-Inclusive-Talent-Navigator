@@ -1,5 +1,11 @@
 # ByteForge-Inclusive-Talent-Navigator
 
+## Prototype documentation
+
+See [PROTOTYPE_DOCUMENTATION.md](./PROTOTYPE_DOCUMENTATION.md) for the
+product overview, user journeys, architecture, API reference, data model,
+security considerations, setup instructions, demonstration script, and roadmap.
+
 ## Backend document extraction
 
 PDF, DOCX, TXT, RTF, XLSX, PPTX, and common image files are read automatically.

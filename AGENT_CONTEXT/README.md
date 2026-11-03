@@ -31,7 +31,8 @@ matching and bias review workflows.
 - Document text extraction currently uses local `pypdf` and `python-docx`.
 - SAP Document AI is not part of the current implementation.
 - Skill taxonomy, market demand, and learning courses are seeded through
-  `Backend/database/migrations/` and are not read from runtime JSON files.
+  `Backend/database/mysql/` or `Backend/database/hana/` and are not read
+  from runtime JSON files.
 
 When changing an agent, preserve the public controller-facing function and
 route response shape unless the task explicitly requires an API change.

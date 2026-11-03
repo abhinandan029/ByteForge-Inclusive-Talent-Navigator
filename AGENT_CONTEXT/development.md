@@ -12,7 +12,7 @@ Backend/
   app/schemas/            Pydantic request/response models
   app/utils/              Shared extraction, auth, and audit helpers
   mcp_server/             FastMCP server tools
-  database/migrations/    Database schema and seed migrations
+  database/               MySQL and SAP HANA schema and seed scripts
 ```
 
 ## Useful commands on Windows

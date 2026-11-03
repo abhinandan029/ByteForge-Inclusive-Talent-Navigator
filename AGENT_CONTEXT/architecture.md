@@ -76,6 +76,6 @@ is handled by `app/models/skills_model.py`; Market Intelligence persistence is
 handled by `app/models/market_model.py`; Career Development persistence is
 handled by `app/models/learning_model.py`.
 
-Domain-data tables are defined and seeded in
-`Backend/database/migrations/001_agent_domain_data_mysql.sql` and
-`001_agent_domain_data_hana.sql`.
+Database schemas and seed scripts are defined in
+`Backend/database/mysql/` and `Backend/database/hana/`. Run each
+`schema.sql` before its `skill_taxonomy_seed.sql`.
