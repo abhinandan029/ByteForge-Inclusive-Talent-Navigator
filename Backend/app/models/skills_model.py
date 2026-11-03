@@ -183,10 +183,23 @@ def save_extracted_skills(employee_id, extracted_skills):
             employee_id
         )
 
+        cursor.execute(
+            """
+            SELECT
+                SKILL_ID,
+                NAME,
+                TAXONOMY_CATEGORY,
+                EVIDENCE_SNIPPET
+            FROM EXTRACTED_SKILLS_DRAFT
+            WHERE EMPLOYEE_ID = ?
+            """,
+            (employee_id,)
+        )
+
         pending_skills = []
         seen_names = set(confirmed_names)
 
-        for skill in extracted_skills:
+        for skill in _fetch_all(cursor):
             name = (skill.get("name") or "").strip()
             normalized_name = _normalize_skill_name(name)
 
@@ -194,7 +207,6 @@ def save_extracted_skills(employee_id, extracted_skills):
                 continue
 
             seen_names.add(normalized_name)
-
             pending_skills.append({
                 "skill_id": skill["skill_id"],
                 "name": name,
@@ -205,6 +217,30 @@ def save_extracted_skills(employee_id, extracted_skills):
                     skill.get("evidence_snippet") or ""
                 )
             })
+
+        new_pending_skills = []
+
+        for skill in extracted_skills:
+            name = (skill.get("name") or "").strip()
+            normalized_name = _normalize_skill_name(name)
+
+            if not name or normalized_name in seen_names:
+                continue
+
+            seen_names.add(normalized_name)
+
+            new_skill = {
+                "skill_id": skill["skill_id"],
+                "name": name,
+                "taxonomy_category": (
+                    skill.get("taxonomy_category") or "General"
+                ),
+                "evidence_snippet": (
+                    skill.get("evidence_snippet") or ""
+                )
+            }
+            pending_skills.append(new_skill)
+            new_pending_skills.append(new_skill)
 
         print("\n========== SKILLS SAVE DEBUG ==========")
         print("Employee ID:", employee_id)
@@ -217,17 +253,8 @@ def save_extracted_skills(employee_id, extracted_skills):
 
         print("=======================================\n")
 
-        # Replace pending proposals only.
-        # Previously confirmed skills are never deleted.
-        cursor.execute(
-            """
-            DELETE FROM EXTRACTED_SKILLS_DRAFT
-            WHERE EMPLOYEE_ID = ?
-            """,
-            (employee_id,)
-        )
-
-        for skill in pending_skills:
+        # Append newly discovered proposals without replacing drafts awaiting review.
+        for skill in new_pending_skills:
             cursor.execute(
                 """
                 INSERT INTO EXTRACTED_SKILLS_DRAFT
@@ -263,7 +290,7 @@ def save_extracted_skills(employee_id, extracted_skills):
             "SKILLS_DISCOVERY",
             (
                 f"{len(extracted_skills)} skills discovered; "
-                f"{len(pending_skills)} new pending skills"
+                f"{len(new_pending_skills)} new pending skills"
             )
         )
 

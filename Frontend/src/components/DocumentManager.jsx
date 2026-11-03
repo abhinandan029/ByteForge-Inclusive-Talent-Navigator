@@ -55,9 +55,7 @@ export default function DocumentManager({ employeeId, onDocumentsChanged }) {
         `Uploaded ${result.uploaded_count || selectedFiles.length} document(s) successfully! Profile text rebuilt.`
       );
       await loadDocuments();
-      if (onDocumentsChanged) {
-        onDocumentsChanged();
-      }
+      await onDocumentsChanged?.({ action: "upload", result });
     } catch (err) {
       setError(err.message || "Failed to upload document.");
     } finally {
@@ -78,9 +76,7 @@ export default function DocumentManager({ employeeId, onDocumentsChanged }) {
       await deleteEmployeeDocument(employeeId, docId);
       setSuccess("Document deleted and profile updated.");
       await loadDocuments();
-      if (onDocumentsChanged) {
-        onDocumentsChanged();
-      }
+      await onDocumentsChanged?.({ action: "delete" });
     } catch (err) {
       setError(err.message || "Failed to delete document.");
     } finally {
