@@ -562,8 +562,8 @@ export default function SkillsPage() {
 
         {/* AI EXTRACTION */}
 
-        <section className="mb-6 overflow-hidden rounded-2xl border border-indigo-200 bg-gradient-to-r from-indigo-700 via-indigo-600 to-purple-600 p-px shadow-sm shadow-indigo-200/50">
-          <div className="rounded-[0.95rem] bg-gradient-to-br from-indigo-50/95 via-white/95 to-purple-50/95 p-5 sm:p-6">
+        <section className="mb-6 overflow-hidden rounded-2xl border border-indigo-200 bg-linear-to-r from-indigo-700 via-indigo-600 to-purple-600 p-px shadow-sm shadow-indigo-200/50">
+          <div className="rounded-[0.95rem] bg-linear-to-br from-indigo-50/95 via-white/95 to-purple-50/95 p-5 sm:p-6">
           <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
             <div className="flex gap-3">
               <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-200">
