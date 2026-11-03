@@ -415,11 +415,10 @@ export default function HRMatching() {
                   )}
 
                   {/* SKILLS BREAKDOWN */}
-                  <div className="mt-4 grid grid-cols-2 gap-2 border-t border-slate-100 pt-4 sm:grid-cols-4">
+                  <div className="mt-4 grid grid-cols-2 gap-2 border-t border-slate-100 pt-4 sm:grid-cols-3">
                     {[
                       ["Skill coverage", breakdown.skill_coverage],
                       ["Evidence strength", breakdown.evidence_strength],
-                      ["Learning progress", breakdown.learning_progress],
                       ["Experience fit", breakdown.experience_fit],
                     ].map(([label, value]) => (
                       <div key={label} className="rounded-lg bg-slate-50 p-2.5">

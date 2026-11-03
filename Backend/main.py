@@ -21,7 +21,6 @@ from app.routes.matching_routes import router as matching_router
 from app.routes.bias_audit_routes import router as bias_audit_router
 from app.routes.market_routes import router as market_router
 from app.routes.learning_routes import router as learning_router
-from app.routes.progress_routes import router as progress_router
 
 
 # ==================================================
@@ -120,7 +119,6 @@ app.include_router(matching_router)
 app.include_router(bias_audit_router)
 app.include_router(market_router)
 app.include_router(learning_router)
-app.include_router(progress_router)
 
 
 # ==================================================

@@ -236,8 +236,6 @@ def get_confirmed_employee_skills(employee_ids):
                 esp.LAST_EVIDENCE_AT,
                 COALESCE(esp.PROJECT_EVIDENCE_COUNT, 0)
                     AS PROJECT_EVIDENCE_COUNT,
-                COALESCE(esp.LEARNING_PROGRESS_SCORE, 0)
-                    AS LEARNING_PROGRESS_SCORE,
                 COALESCE(esp.MANAGER_VALIDATED, 0)
                     AS MANAGER_VALIDATED
             FROM CONFIRMED_SKILLS_FINAL cs

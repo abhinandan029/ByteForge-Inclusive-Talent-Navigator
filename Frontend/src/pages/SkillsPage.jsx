@@ -23,7 +23,6 @@ import {
 import { useAuth } from "../contexts/AuthContext";
 import DocumentManager from "../components/DocumentManager";
 import AgentRunPanel from "../components/AgentRunPanel";
-import ProgressProfilePanel from "../components/ProgressProfilePanel";
 
 
 export default function SkillsPage() {
@@ -546,8 +545,6 @@ export default function SkillsPage() {
             onDocumentsChanged={refreshSkills}
           />
         </div>
-
-        <ProgressProfilePanel />
 
         {extracting && (
           <AgentRunPanel

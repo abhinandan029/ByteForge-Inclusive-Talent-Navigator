@@ -351,7 +351,6 @@ def _run_inclusive_matching_core(
             total_weight = 0.0
             matched_weight = 0.0
             evidence_score_total = 0.0
-            learning_score_total = 0.0
 
             valid_requirement_count = 0
 
@@ -441,25 +440,10 @@ def _run_inclusive_matching_core(
                         )
                     )
                     project_factor = min(project_count / 3.0, 1.0)
-                    learning_factor = min(
-                        max(
-                            _to_float(
-                                _get(
-                                    skill_record,
-                                    "LEARNING_PROGRESS_SCORE",
-                                    "learning_progress_score",
-                                    default=0,
-                                )
-                            ) / 100.0,
-                            0.0,
-                        ),
-                        1.0,
-                    )
                     matched_weight += weight * proficiency_fit
                     evidence_score_total += weight * (
                         (confidence * 0.7) + (project_factor * 0.3)
                     )
-                    learning_score_total += weight * learning_factor
 
                     matched_skills.append({
                         "skill_name": skill_name,
@@ -508,20 +492,15 @@ def _run_inclusive_matching_core(
                 (evidence_score_total / total_weight) * 100,
                 2,
             ) if total_weight else 0.0
-            learning_score = round(
-                (learning_score_total / total_weight) * 100,
-                2,
-            ) if total_weight else 0.0
             skill_score = round(
                 (matched_weight / total_weight) * 100,
                 2,
             ) if total_weight else 0.0
             experience_score = 100.0 if not warning else 60.0
             match_score = round(
-                (skill_score * 0.55)
-                + (evidence_score * 0.20)
-                + (learning_score * 0.10)
-                + (experience_score * 0.15),
+                (skill_score * (55 / 90))
+                + (evidence_score * (20 / 90))
+                + (experience_score * (15 / 90)),
                 2,
             ) if total_weight else 0.0
 
@@ -604,7 +583,6 @@ def _run_inclusive_matching_core(
                 "score_breakdown": {
                     "skill_coverage": skill_score,
                     "evidence_strength": evidence_score,
-                    "learning_progress": learning_score,
                     "experience_fit": experience_score,
                 },
 

@@ -19,15 +19,11 @@ source metadata. Skill extraction preserves section context, handles bullets,
 wrapped lines, table-style separators, canonical names, and aliases, and stores
 the containing line as evidence for employee review.
 
-## Structured employee progress
+## Matching progress signals
 
-Document extraction is optional. Employees can add career goals and project
-evidence from the Skills page through the `/api/progress` endpoints. Confirmed
-skills receive inferred proficiency and evidence-confidence metadata, while
-matching exposes skill coverage, evidence strength, learning progress, and
-experience-fit breakdowns. HR can record manager validation through the
-manager-validation endpoint; validation is an auditable signal and does not
-silently override the matching score.
+Confirmed skills receive inferred proficiency and evidence-confidence metadata,
+while matching exposes skill coverage, evidence strength, and experience-fit
+breakdowns.
 
 Market intelligence labels live active-role demand separately from simulated
 fallback data. SAP Learning Hub API synchronization is intentionally not
