@@ -41,12 +41,10 @@ export default function AuditLogPage() {
   const filteredLogs = logs.filter((log) => {
     const actor = log.ACTOR || log.actor || "";
     const action = log.ACTION || log.action || "";
-    const tool = log.TOOL || log.tool || "";
     const details = typeof log.DETAILS === "string" ? log.DETAILS : JSON.stringify(log.DETAILS || "");
 
     const matchesSearch =
       action.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      tool.toLowerCase().includes(searchTerm.toLowerCase()) ||
       actor.toLowerCase().includes(searchTerm.toLowerCase()) ||
       details.toLowerCase().includes(searchTerm.toLowerCase());
 
@@ -89,7 +87,7 @@ export default function AuditLogPage() {
               Employee Audit Log
             </h1>
             <p className="mt-1 text-sm text-slate-500">
-              Complete verifiable record of all AI actions, tool invocations, and employee skill confirmations.
+              Complete verifiable record of AI actions and employee skill confirmations.
             </p>
           </div>
 
@@ -130,7 +128,7 @@ export default function AuditLogPage() {
             />
             <input
               type="text"
-              placeholder="Search actions, tools, or keywords..."
+              placeholder="Search actions or keywords..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-xs font-medium text-slate-800 placeholder-slate-400 shadow-sm focus:border-indigo-500 focus:outline-none"
@@ -184,7 +182,6 @@ export default function AuditLogPage() {
                     <th className="px-6 py-3.5">Timestamp</th>
                     <th className="px-6 py-3.5">Actor</th>
                     <th className="px-6 py-3.5">Action</th>
-                    <th className="px-6 py-3.5">Tool / System</th>
                     <th className="px-6 py-3.5">Details</th>
                   </tr>
                 </thead>
@@ -194,7 +191,6 @@ export default function AuditLogPage() {
                     const timestamp = log.LOG_TIMESTAMP || log.log_timestamp || log.created_at;
                     const actor = log.ACTOR || log.actor;
                     const action = log.ACTION || log.action;
-                    const tool = log.TOOL || log.tool;
                     const details = log.DETAILS || log.details;
 
                     return (
@@ -212,12 +208,6 @@ export default function AuditLogPage() {
 
                         <td className="px-6 py-4 font-mono font-semibold text-slate-800">
                           {action || "—"}
-                        </td>
-
-                        <td className="px-6 py-4 text-slate-600">
-                          <span className="rounded bg-slate-100 px-2 py-0.5 font-mono text-[11px]">
-                            {tool || "Direct Action"}
-                          </span>
                         </td>
 
                         <td className="px-6 py-4 min-w-[320px] max-w-lg">

@@ -21,6 +21,11 @@ class MatchedSkill(BaseModel):
     skill_name: str
     taxonomy_category: Optional[str] = None
     weight: float = 1.0
+    inferred_proficiency: Optional[str] = None
+    proficiency_fit: Optional[float] = None
+    evidence_confidence: Optional[float] = None
+    project_evidence_count: int = 0
+    manager_validated: bool = False
 
 
 class MissingSkill(BaseModel):
@@ -64,6 +69,7 @@ class MatchingResultItem(BaseModel):
 
     experience_warning: Optional[str] = None
     match_explanation: Optional[str] = None
+    score_breakdown: dict[str, float] = Field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------

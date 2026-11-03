@@ -424,6 +424,77 @@ def save_confirmed_skills(employee_id, confirmed_skills):
             existing_confirmed_names.add(normalized_name)
             newly_confirmed.append(skill_to_save)
 
+            evidence = skill_to_save["evidence_snippet"]
+            evidence_lower = evidence.casefold()
+            proficiency = "Intermediate"
+            if any(
+                marker in evidence_lower
+                for marker in ("led ", "architected", "designed", "expert")
+            ):
+                proficiency = "Advanced"
+            elif any(
+                marker in evidence_lower
+                for marker in ("used ", "worked with", "experience", "built")
+            ):
+                proficiency = "Intermediate"
+            else:
+                proficiency = "Beginner"
+
+            confidence = 0.85 if len(evidence) >= 80 else 0.65
+            cursor.execute(
+                """
+                INSERT INTO EMPLOYEE_SKILL_PROGRESS
+                    (EMPLOYEE_ID, SKILL_NAME, INFERRED_PROFICIENCY,
+                     EVIDENCE_CONFIDENCE, LAST_EVIDENCE_AT,
+                     EMPLOYEE_CONFIRMED)
+                VALUES (?, ?, ?, ?, CURRENT_DATE, 1)
+                ON DUPLICATE KEY UPDATE
+                    INFERRED_PROFICIENCY = VALUES(INFERRED_PROFICIENCY),
+                    EVIDENCE_CONFIDENCE = VALUES(EVIDENCE_CONFIDENCE),
+                    LAST_EVIDENCE_AT = CURRENT_DATE,
+                    EMPLOYEE_CONFIRMED = 1,
+                    UPDATED_AT = CURRENT_TIMESTAMP
+                """,
+                (
+                    employee_id,
+                    skill_to_save["name"],
+                    proficiency,
+                    confidence,
+                ),
+            )
+
+        cursor.execute(
+            """
+            INSERT INTO EMPLOYEE_SKILL_PROGRESS
+                (EMPLOYEE_ID, SKILL_NAME, INFERRED_PROFICIENCY,
+                 EVIDENCE_CONFIDENCE, LAST_EVIDENCE_AT,
+                 EMPLOYEE_CONFIRMED)
+            SELECT
+                EMPLOYEE_ID,
+                NAME,
+                CASE
+                    WHEN LOWER(EVIDENCE_SNIPPET) LIKE '%architected%'
+                      OR LOWER(EVIDENCE_SNIPPET) LIKE '%led %'
+                      OR LOWER(EVIDENCE_SNIPPET) LIKE '%designed%'
+                    THEN 'Advanced'
+                    WHEN LOWER(EVIDENCE_SNIPPET) LIKE '%experience%'
+                      OR LOWER(EVIDENCE_SNIPPET) LIKE '%built%'
+                      OR LOWER(EVIDENCE_SNIPPET) LIKE '%used %'
+                    THEN 'Intermediate'
+                    ELSE 'Beginner'
+                END,
+                CASE WHEN LENGTH(EVIDENCE_SNIPPET) >= 80
+                     THEN 0.85 ELSE 0.65 END,
+                DATE(CONFIRMED_AT),
+                1
+            FROM CONFIRMED_SKILLS_FINAL
+            WHERE EMPLOYEE_ID = ?
+            ON DUPLICATE KEY UPDATE
+                EMPLOYEE_CONFIRMED = 1
+            """,
+            (employee_id,),
+        )
+
         # The employee has reviewed the entire pending list.
         # Delete accepted AND rejected pending suggestions.
         cursor.execute(
@@ -469,12 +540,21 @@ def save_confirmed_skills(employee_id, confirmed_skills):
         cursor.execute(
             """
             SELECT
-                NAME,
-                TAXONOMY_CATEGORY,
-                EVIDENCE_SNIPPET
-            FROM CONFIRMED_SKILLS_FINAL
-            WHERE EMPLOYEE_ID = ?
-            ORDER BY NAME
+                cs.NAME,
+                cs.TAXONOMY_CATEGORY,
+                cs.EVIDENCE_SNIPPET,
+                COALESCE(esp.INFERRED_PROFICIENCY, 'Intermediate')
+                    AS INFERRED_PROFICIENCY,
+                COALESCE(esp.EVIDENCE_CONFIDENCE, 0.50)
+                    AS EVIDENCE_CONFIDENCE,
+                COALESCE(esp.MANAGER_VALIDATED, 0)
+                    AS MANAGER_VALIDATED
+            FROM CONFIRMED_SKILLS_FINAL cs
+            LEFT JOIN EMPLOYEE_SKILL_PROGRESS esp
+                ON esp.EMPLOYEE_ID = cs.EMPLOYEE_ID
+               AND esp.SKILL_NAME = cs.NAME
+            WHERE cs.EMPLOYEE_ID = ?
+            ORDER BY cs.NAME
             """,
             (employee_id,)
         )
@@ -569,12 +649,21 @@ def get_employee_skills(employee_id):
         cursor.execute(
             """
             SELECT
-                NAME,
-                TAXONOMY_CATEGORY,
-                EVIDENCE_SNIPPET
-            FROM CONFIRMED_SKILLS_FINAL
-            WHERE EMPLOYEE_ID = ?
-            ORDER BY NAME
+                cs.NAME,
+                cs.TAXONOMY_CATEGORY,
+                cs.EVIDENCE_SNIPPET,
+                COALESCE(esp.INFERRED_PROFICIENCY, 'Intermediate')
+                    AS INFERRED_PROFICIENCY,
+                COALESCE(esp.EVIDENCE_CONFIDENCE, 0.50)
+                    AS EVIDENCE_CONFIDENCE,
+                COALESCE(esp.MANAGER_VALIDATED, 0)
+                    AS MANAGER_VALIDATED
+            FROM CONFIRMED_SKILLS_FINAL cs
+            LEFT JOIN EMPLOYEE_SKILL_PROGRESS esp
+                ON esp.EMPLOYEE_ID = cs.EMPLOYEE_ID
+               AND esp.SKILL_NAME = cs.NAME
+            WHERE cs.EMPLOYEE_ID = ?
+            ORDER BY cs.NAME
             """,
             (employee_id,)
         )

@@ -224,14 +224,28 @@ def get_confirmed_employee_skills(employee_ids):
 
         query = f"""
             SELECT
-                EMPLOYEE_ID,
-                NAME,
-                TAXONOMY_CATEGORY,
-                EVIDENCE_SNIPPET,
-                CONFIRMED_AT
-            FROM CONFIRMED_SKILLS_FINAL
-            WHERE EMPLOYEE_ID IN ({placeholders})
-            ORDER BY EMPLOYEE_ID, NAME
+                cs.EMPLOYEE_ID,
+                cs.NAME,
+                cs.TAXONOMY_CATEGORY,
+                cs.EVIDENCE_SNIPPET,
+                cs.CONFIRMED_AT,
+                COALESCE(esp.INFERRED_PROFICIENCY, 'Intermediate')
+                    AS INFERRED_PROFICIENCY,
+                COALESCE(esp.EVIDENCE_CONFIDENCE, 0.50)
+                    AS EVIDENCE_CONFIDENCE,
+                esp.LAST_EVIDENCE_AT,
+                COALESCE(esp.PROJECT_EVIDENCE_COUNT, 0)
+                    AS PROJECT_EVIDENCE_COUNT,
+                COALESCE(esp.LEARNING_PROGRESS_SCORE, 0)
+                    AS LEARNING_PROGRESS_SCORE,
+                COALESCE(esp.MANAGER_VALIDATED, 0)
+                    AS MANAGER_VALIDATED
+            FROM CONFIRMED_SKILLS_FINAL cs
+            LEFT JOIN EMPLOYEE_SKILL_PROGRESS esp
+                ON esp.EMPLOYEE_ID = cs.EMPLOYEE_ID
+               AND esp.SKILL_NAME = cs.NAME
+            WHERE cs.EMPLOYEE_ID IN ({placeholders})
+            ORDER BY cs.EMPLOYEE_ID, cs.NAME
         """
 
         cursor.execute(query, params)
@@ -265,6 +279,7 @@ def _serialize_result(result):
         "missing_mandatory_skills": result.get(
             "missing_mandatory_skills"
         ) or [],
+        "score_breakdown": result.get("score_breakdown") or {},
     }
 
     return (
@@ -301,6 +316,9 @@ def _restore_result(row):
         row["experience_warning"] = explanation.get(
             "experience_warning"
         )
+        row["score_breakdown"] = explanation.get(
+            "score_breakdown"
+        ) or {}
 
         row["missing_mandatory_skills"] = (
             explanation.get(

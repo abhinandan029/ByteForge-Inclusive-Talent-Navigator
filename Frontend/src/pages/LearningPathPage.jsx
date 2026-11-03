@@ -459,6 +459,11 @@ export default function LearningPathPage() {
                                 >
                                   {item.demand_level}
                                 </span>
+                                <span className="mt-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                                  {item.source === "ACTIVE_INTERNAL_ROLES"
+                                    ? "Live internal roles"
+                                    : "Simulated fallback"}
+                                </span>
                               </td>
                               <td className="px-6 py-4">
                                 <div className="flex items-center gap-1 text-xs font-medium">

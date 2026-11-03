@@ -47,10 +47,17 @@ def get_learning_session_record(employee_id: str) -> dict:
             })
         cursor.execute(
             """
-            SELECT COURSE_ID, TITLE, TARGET_SKILL, DURATION, SAP_LEARNING_HUB_URL
-            FROM LEARNING_COURSES
-            WHERE IS_ACTIVE = 1
-            ORDER BY COURSE_ID
+            SELECT
+                lc.COURSE_ID,
+                lc.TITLE,
+                COALESCE(st.CANONICAL_NAME, lc.SKILL_ID) AS TARGET_SKILL,
+                CONCAT(lc.DURATION_HOURS, ' hours') AS DURATION,
+                lc.SAP_LEARNING_HUB_URL
+            FROM LEARNING_COURSES lc
+            LEFT JOIN SKILL_TAXONOMY st
+                ON st.SKILL_ID = lc.SKILL_ID
+            WHERE lc.IS_ACTIVE = 1
+            ORDER BY lc.COURSE_ID
             """
         )
         columns = [column[0].lower() for column in cursor.description]

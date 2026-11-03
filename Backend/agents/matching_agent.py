@@ -178,6 +178,47 @@ def _employee_has_skill(
     return False
 
 
+def _employee_skill_record(
+    requirement_name: str,
+    confirmed_skills: list[dict],
+) -> dict | None:
+    normalized_requirement = _normalize_skill(requirement_name)
+    for skill in confirmed_skills:
+        confirmed_name = _normalize_skill(
+            _get(skill, "NAME", "name", "SKILL_NAME", "skill_name")
+        )
+        evidence = _get(
+            skill, "EVIDENCE_SNIPPET", "evidence_snippet", default=""
+        )
+        if (
+            confirmed_name == normalized_requirement
+            or _contains_exact_phrase(evidence, normalized_requirement)
+        ):
+            return skill
+    return None
+
+
+def _proficiency_value(value: Any) -> float:
+    values = {
+        "beginner": 0.45,
+        "basic": 0.45,
+        "intermediate": 0.70,
+        "advanced": 0.90,
+        "expert": 1.00,
+    }
+    return values.get(str(value or "").strip().casefold(), 0.70)
+
+
+def _required_proficiency_value(value: Any) -> float:
+    return {
+        "beginner": 0.45,
+        "basic": 0.45,
+        "intermediate": 0.70,
+        "advanced": 0.90,
+        "expert": 1.00,
+    }.get(str(value or "").strip().casefold(), 0.70)
+
+
 # ---------------------------------------------------------------------
 # Experience information
 # ---------------------------------------------------------------------
@@ -309,6 +350,8 @@ def _run_inclusive_matching_core(
 
             total_weight = 0.0
             matched_weight = 0.0
+            evidence_score_total = 0.0
+            learning_score_total = 0.0
 
             valid_requirement_count = 0
 
@@ -356,16 +399,93 @@ def _run_inclusive_matching_core(
 
                 total_weight += weight
 
-                if _employee_has_skill(
-                    skill_name,
-                    confirmed_skills,
-                ):
-                    matched_weight += weight
+                skill_record = _employee_skill_record(
+                    skill_name, confirmed_skills
+                )
+
+                if skill_record:
+                    proficiency = _proficiency_value(
+                        _get(
+                            skill_record,
+                            "INFERRED_PROFICIENCY",
+                            "inferred_proficiency",
+                        )
+                    )
+                    required_level = _required_proficiency_value(
+                        required_proficiency
+                    )
+                    proficiency_fit = min(
+                        proficiency / required_level, 1.0
+                    )
+                    confidence = min(
+                        max(
+                            _to_float(
+                                _get(
+                                    skill_record,
+                                    "EVIDENCE_CONFIDENCE",
+                                    "evidence_confidence",
+                                    default=0.5,
+                                ),
+                                0.5,
+                            ),
+                            0.0,
+                        ),
+                        1.0,
+                    )
+                    project_count = _to_float(
+                        _get(
+                            skill_record,
+                            "PROJECT_EVIDENCE_COUNT",
+                            "project_evidence_count",
+                            default=0,
+                        )
+                    )
+                    project_factor = min(project_count / 3.0, 1.0)
+                    learning_factor = min(
+                        max(
+                            _to_float(
+                                _get(
+                                    skill_record,
+                                    "LEARNING_PROGRESS_SCORE",
+                                    "learning_progress_score",
+                                    default=0,
+                                )
+                            ) / 100.0,
+                            0.0,
+                        ),
+                        1.0,
+                    )
+                    matched_weight += weight * proficiency_fit
+                    evidence_score_total += weight * (
+                        (confidence * 0.7) + (project_factor * 0.3)
+                    )
+                    learning_score_total += weight * learning_factor
 
                     matched_skills.append({
                         "skill_name": skill_name,
                         "taxonomy_category": taxonomy_category,
                         "weight": weight,
+                        "inferred_proficiency": _get(
+                            skill_record,
+                            "INFERRED_PROFICIENCY",
+                            "inferred_proficiency",
+                            default="Intermediate",
+                        ),
+                        "proficiency_fit": round(
+                            proficiency_fit * 100, 2
+                        ),
+                        "evidence_confidence": round(
+                            confidence * 100, 2
+                        ),
+                        "project_evidence_count": int(project_count),
+                        "manager_validated": _to_bool(
+                            _get(
+                                skill_record,
+                                "MANAGER_VALIDATED",
+                                "manager_validated",
+                                default=False,
+                            )
+                        ),
                     })
 
                 else:
@@ -380,19 +500,30 @@ def _run_inclusive_matching_core(
                     if is_mandatory:
                         missing_mandatory_skills.append(skill_name)
 
-            match_score = (
-                round(
-                    (matched_weight / total_weight) * 100,
-                    2,
-                )
-                if total_weight > 0
-                else 0.0
-            )
-
             warning = _experience_warning(
                 employee,
                 role,
             )
+            evidence_score = round(
+                (evidence_score_total / total_weight) * 100,
+                2,
+            ) if total_weight else 0.0
+            learning_score = round(
+                (learning_score_total / total_weight) * 100,
+                2,
+            ) if total_weight else 0.0
+            skill_score = round(
+                (matched_weight / total_weight) * 100,
+                2,
+            ) if total_weight else 0.0
+            experience_score = 100.0 if not warning else 60.0
+            match_score = round(
+                (skill_score * 0.55)
+                + (evidence_score * 0.20)
+                + (learning_score * 0.10)
+                + (experience_score * 0.15),
+                2,
+            ) if total_weight else 0.0
 
             role_title = _get(
                 role,
@@ -470,6 +601,12 @@ def _run_inclusive_matching_core(
                 ),
 
                 "experience_warning": warning,
+                "score_breakdown": {
+                    "skill_coverage": skill_score,
+                    "evidence_strength": evidence_score,
+                    "learning_progress": learning_score,
+                    "experience_fit": experience_score,
+                },
 
                 "match_explanation": " ".join(
                     explanation_parts
